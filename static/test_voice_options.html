@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>动态声音选项测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        select { margin: 10px 0; padding: 5px; width: 200px; }
+        .description { margin: 10px 0; padding: 10px; background: #f5f5f5; }
+        .log { margin: 10px 0; padding: 10px; background: #f0f0f0; font-family: monospace; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>动态声音选项功能测试</h1>
+
+    <div class="test-section">
+        <h3>测试角色配置</h3>
+        <div>
+            <label>性别：</label>
+            <select id="gender-select">
+                <option value="">选择性别</option>
+                <option value="男性">男性</option>
+                <option value="女性">女性</option>
+            </select>
+        </div>
+        <div>
+            <label>年龄：</label>
+            <select id="age-select">
+                <option value="">请先选择性别</option>
+            </select>
+        </div>
+        <div>
+            <label>声音风格：</label>
+            <select id="style-select">
+                <option value="">请先选择性别和年龄</option>
+            </select>
+        </div>
+        <div>
+            <label>风格描述：</label>
+            <div id="style-description" class="description">选择声音风格后显示描述</div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试日志</h3>
+        <div id="test-log" class="log">等待测试开始...</div>
+    </div>
+
+    <script>
+        let voiceCombinations = {};
+
+        function log(message) {
+            const logDiv = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 加载所有声音组合
+        async function loadVoiceCombinations() {
+            try {
+                log('开始加载声音组合数据...');
+                const response = await fetch('/api/all-voice-combinations');
+                const data = await response.json();
+
+                if (data.success && data.data && data.data.所有组合) {
+                    voiceCombinations = {};
+                    const combinations = data.data.所有组合;
+
+                    combinations.forEach(comb => {
+                        if (comb.支持性别) {
+                            comb.支持性别.forEach(gender => {
+                                if (!voiceCombinations[gender]) {
+                                    voiceCombinations[gender] = [];
+                                }
+                                voiceCombinations[gender].push(comb);
+                            });
+                        }
+                    });
+
+                    log(`成功加载声音组合数据，共 ${combinations.length} 个组合`);
+                    log(`支持的性别: ${Object.keys(voiceCombinations).join(', ')}`);
+                } else {
+                    log('错误：无法加载声音组合数据');
+                }
+            } catch (error) {
+                log(`错误：${error.message}`);
+            }
+        }
+
+        // 更新年龄选项
+        function updateAgeOptions() {
+            const gender = document.getElementById('gender-select').value;
+            const ageSelect = document.getElementById('age-select');
+
+            log(`选择性别: ${gender}`);
+
+            ageSelect.innerHTML = '<option value="">选择年龄</option>';
+
+            if (!gender || !voiceCombinations[gender]) {
+                log('没有找到该性别的声音组合');
+                return;
+            }
+
+            const ages = new Set();
+            voiceCombinations[gender].forEach(comb => {
+                if (comb.年龄显示) {
+                    ages.add(comb.年龄显示);
+                }
+            });
+
+            Array.from(ages).sort().forEach(age => {
+                ageSelect.innerHTML += `<option value="${age}">${age}</option>`;
+            });
+
+            log(`可用年龄选项: ${Array.from(ages).join(', ')}`);
+        }
+
+        // 更新声音风格选项
+        function updateStyleOptions() {
+            const gender = document.getElementById('gender-select').value;
+            const age = document.getElementById('age-select').value;
+            const styleSelect = document.getElementById('style-select');
+
+            log(`选择年龄: ${age} (性别: ${gender})`);
+
+            styleSelect.innerHTML = '<option value="">选择声音风格</option>';
+            document.getElementById('style-description').textContent = '选择声音风格后显示描述';
+
+            if (!gender || !age || !voiceCombinations[gender]) {
+                return;
+            }
+
+            const availableStyles = voiceCombinations[gender].filter(comb =>
+                comb.年龄显示 === age
+            );
+
+            log(`找到 ${availableStyles.length} 个匹配的声音风格`);
+
+            availableStyles.forEach(combo => {
+                const option = document.createElement('option');
+                option.value = combo.风格;
+                option.textContent = combo.风格;
+                option.dataset.description = combo.风格描述 || '';
+                styleSelect.appendChild(option);
+            });
+        }
+
+        // 更新风格描述
+        function updateStyleDescription() {
+            const styleSelect = document.getElementById('style-select');
+            const description = styleSelect.options[styleSelect.selectedIndex]?.dataset.description || '';
+            document.getElementById('style-description').textContent = description || '选择声音风格后显示描述';
+
+            if (description) {
+                log(`选择声音风格: ${styleSelect.value} - ${description}`);
+            }
+        }
+
+        // 事件监听器
+        document.getElementById('gender-select').addEventListener('change', updateAgeOptions);
+        document.getElementById('age-select').addEventListener('change', updateStyleOptions);
+        document.getElementById('style-select').addEventListener('change', updateStyleDescription);
+
+        // 页面加载时初始化
+        window.addEventListener('load', () => {
+            log('页面加载完成，开始初始化...');
+            loadVoiceCombinations();
+        });
+    </script>
+</body>
+</html>

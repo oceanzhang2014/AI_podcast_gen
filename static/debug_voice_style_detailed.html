@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调试声音风格选项 - 详细版本</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>调试声音风格选项 - 详细版本</h2>
+
+        <!-- 显示所有调试信息的区域 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>调试控制台输出</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="debug-console" class="border p-3 bg-light" style="height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px;">
+                            <div class="text-muted">等待调试信息...</div>
+                        </div>
+                        <button class="btn btn-sm btn-danger mt-2" onclick="clearDebugConsole()">清空日志</button>
+                        <button class="btn btn-sm btn-primary mt-2 ms-2" onclick="downloadDebugLog()">下载日志</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API测试区域 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>API测试</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button class="btn btn-primary" onclick="testMaleAPI()">测试男性API</button>
+                                <button class="btn btn-success ms-2" onclick="testFemaleAPI()">测试女性API</button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-info" onclick="testAllAPI()">测试所有API</button>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <h6>API响应：</h6>
+                            <pre id="api-response" class="bg-light p-3" style="max-height: 200px; overflow-y: auto;">等待测试...</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模拟角色配置区域 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>模拟角色配置</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">性别</label>
+                                <select class="form-select" id="test-gender-select">
+                                    <option value="">选择性别</option>
+                                    <option value="男性">男性</option>
+                                    <option value="女性">女性</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">年龄</label>
+                                <select class="form-select" id="test-age-select">
+                                    <option value="">请先选择性别</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">声音风格</label>
+                                <select class="form-select" id="test-style-select">
+                                    <option value="">请先选择性别和年龄</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">动作</label>
+                                <div class="mt-4">
+                                    <button class="btn btn-warning" onclick="selectGender()">选择性别</button>
+                                    <button class="btn btn-info ms-2" onclick="selectAge()">选择年龄</button>
+                                    <button class="btn btn-success ms-2" onclick="selectStyle()">选择风格</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <h6>当前选择：</h6>
+                            <div id="current-selection" class="bg-light p-3">
+                                <div>性别: <span id="current-gender">-</span></div>
+                                <div>年龄: <span id="current-age">-</span></div>
+                                <div>风格: <span id="current-style">-</span></div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <h6>窗口变量状态：</h6>
+                            <div id="window-vars" class="bg-light p-3">
+                                <div>window.voiceCombinations: <span id="voice-combinations-status">未初始化</span></div>
+                                <div>window.filteredVoiceCombinations: <span id="filtered-combinations-status">未初始化</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let debugLog = [];
+
+        // 重写console.log来捕获调试信息
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+            debugLog.push(`[${new Date().toLocaleTimeString()}] ${message}`);
+            updateDebugConsole();
+        };
+
+        function updateDebugConsole() {
+            const consoleDiv = document.getElementById('debug-console');
+            consoleDiv.innerHTML = debugLog.slice(-50).join('\n');
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function clearDebugConsole() {
+            debugLog = [];
+            updateDebugConsole();
+        }
+
+        function downloadDebugLog() {
+            const blob = new Blob([debugLog.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `debug-log-${new Date().toISOString().slice(0, 19)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // API测试函数
+        async function testMaleAPI() {
+            logDebug('开始测试男性API...');
+            try {
+                const response = await fetch('/api/voice-combinations/male');
+                const data = await response.json();
+                logDebug(`API响应状态: ${response.status}`);
+                logDebug(`API响应数据:`, data);
+                document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+                return data;
+            } catch (error) {
+                logDebug(`API调用失败: ${error.message}`);
+                throw error;
+            }
+        }
+
+        async function testFemaleAPI() {
+            logDebug('开始测试女性API...');
+            try {
+                const response = await fetch('/api/voice-combinations/female');
+                const data = await response.json();
+                logDebug(`API响应状态: ${response.status}`);
+                logDebug(`API响应数据:`, data);
+                document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+                return data;
+            } catch (error) {
+                logDebug(`API调用失败: ${error.message}`);
+                throw error;
+            }
+        }
+
+        async function testAllAPI() {
+            logDebug('开始测试所有API...');
+            try {
+                const [maleData, femaleData] = await Promise.all([
+                    testMaleAPI(),
+                    testFemaleAPI()
+                ]);
+
+                // 存储到window变量
+                window.voiceCombinations = {};
+                window.voiceCombinations['男性'] = formatCombinations(maleData.data.combinations);
+                window.voiceCombinations['女性'] = formatCombinations(femaleData.data.combinations);
+
+                updateWindowVarsStatus();
+                logDebug('所有API数据已加载到window.voiceCombinations');
+            } catch (error) {
+                logDebug(`批量API测试失败: ${error.message}`);
+            }
+        }
+
+        async function loadGenderSpecificData(gender) {
+            try {
+                const genderForApi = gender === '男性' ? 'male' : 'female';
+                logDebug(`正在调用API: /api/voice-combinations/${genderForApi}`);
+
+                const response = await fetch(`/api/voice-combinations/${genderForApi}`);
+                const data = await response.json();
+
+                logDebug(`API响应状态: ${response.status}`);
+                logDebug(`API响应数据:`, data);
+
+                if (data.success && data.data && data.data.combinations) {
+                    window.voiceCombinations = window.voiceCombinations || {};
+                    window.voiceCombinations[gender] = formatCombinations(data.data.combinations);
+                    updateWindowVarsStatus();
+                    logDebug(`成功加载并存储 ${data.data.combinations.length} 个${gender}组合到 window.voiceCombinations[${gender}]`);
+                } else {
+                    logDebug(`API响应格式错误:`, data);
+                }
+            } catch (error) {
+                logDebug(`加载${gender}数据失败: ${error.message}`);
+            }
+        }
+
+        function formatCombinations(combinations) {
+            return combinations.map(comb => ({
+                风格: comb.风格,
+                年龄: comb.年龄,
+                年龄显示: comb.年龄,
+                描述: comb.描述 && comb.描述[0] ? comb.描述[0] : '',
+                风格描述: comb.描述 && comb.描述[0] ? comb.描述[0] : ''
+            }));
+        }
+
+        // 模拟函数
+        async function selectGender() {
+            const genderSelect = document.getElementById('test-gender-select');
+            const gender = genderSelect.value;
+
+            logDebug(`选择性别: ${gender}`);
+            document.getElementById('current-gender').textContent = gender || '-';
+
+            if (!gender) return;
+
+            // 自动加载API数据（如果还没有加载）
+            if (!window.voiceCombinations || !window.voiceCombinations[gender]) {
+                logDebug(`window.voiceCombinations[${gender}] 不存在，正在自动加载API数据...`);
+                await loadGenderSpecificData(gender);
+            }
+
+            // 清空年龄和风格选项
+            const ageSelect = document.getElementById('test-age-select');
+            const styleSelect = document.getElementById('test-style-select');
+            ageSelect.innerHTML = '<option value="">选择年龄</option>';
+            styleSelect.innerHTML = '<option value="">请先选择年龄</option>';
+
+            // 填充年龄选项
+            if (window.voiceCombinations && window.voiceCombinations[gender]) {
+                const combinations = window.voiceCombinations[gender];
+                const ages = new Set();
+                combinations.forEach(comb => {
+                    if (comb.年龄) ages.add(comb.年龄);
+                });
+
+                Array.from(ages).sort().forEach(age => {
+                    ageSelect.innerHTML += `<option value="${age}">${age}</option>`;
+                    logDebug(`添加年龄选项: ${age}`);
+                });
+
+                logDebug(`为性别 ${gender} 添加了 ${ages.size} 个年龄选项`);
+            } else {
+                logDebug(`警告: window.voiceCombinations[${gender}] 不存在`);
+            }
+        }
+
+        function selectAge() {
+            const genderSelect = document.getElementById('test-gender-select');
+            const ageSelect = document.getElementById('test-age-select');
+            const gender = genderSelect.value;
+            const age = ageSelect.value;
+
+            logDebug(`选择年龄: ${age} (性别: ${gender})`);
+            document.getElementById('current-age').textContent = age || '-';
+
+            if (!gender || !age) return;
+
+            // 清空风格选项
+            const styleSelect = document.getElementById('test-style-select');
+            styleSelect.innerHTML = '<option value="">选择声音风格</option>';
+
+            // 筛选并填充风格选项
+            if (window.voiceCombinations && window.voiceCombinations[gender]) {
+                const combinations = window.voiceCombinations[gender];
+                logDebug(`可用组合数量: ${combinations.length}`);
+
+                const filteredCombinations = combinations.filter(comb => {
+                    const match = (comb.年龄显示 === age || comb.年龄 === age);
+                    if (match) {
+                        logDebug(`匹配组合:`, comb);
+                    }
+                    return match;
+                });
+
+                logDebug(`筛选后的组合数量: ${filteredCombinations.length}`);
+
+                const styles = new Set();
+                filteredCombinations.forEach(comb => {
+                    if (comb.风格) {
+                        styles.add(comb.风格);
+                        logDebug(`找到风格: ${comb.风格}`);
+                    }
+                });
+
+                logDebug(`可用风格数量: ${styles.size}`);
+
+                Array.from(styles).sort().forEach(style => {
+                    styleSelect.innerHTML += `<option value="${style}">${style}</option>`;
+                    logDebug(`添加风格选项: ${style}`);
+                });
+
+                // 存储筛选结果
+                window.filteredVoiceCombinations = window.filteredVoiceCombinations || {};
+                window.filteredVoiceCombinations[`${gender}_${age}`] = filteredCombinations;
+                updateWindowVarsStatus();
+
+                logDebug(`存储筛选结果到 window.filteredVoiceCombinations[${gender}_${age}]`);
+            } else {
+                logDebug(`警告: window.voiceCombinations[${gender}] 不存在`);
+            }
+        }
+
+        function selectStyle() {
+            const genderSelect = document.getElementById('test-gender-select');
+            const ageSelect = document.getElementById('test-age-select');
+            const styleSelect = document.getElementById('test-style-select');
+            const gender = genderSelect.value;
+            const age = ageSelect.value;
+            const style = styleSelect.value;
+
+            logDebug(`选择风格: ${style} (性别: ${gender}, 年龄: ${age})`);
+            document.getElementById('current-style').textContent = style || '-';
+
+            if (!gender || !age || !style) return;
+
+            // 显示风格描述
+            if (window.filteredVoiceCombinations && window.filteredVoiceCombinations[`${gender}_${age}`]) {
+                const combinations = window.filteredVoiceCombinations[`${gender}_${age}`];
+                const combination = combinations.find(comb => comb.风格 === style);
+
+                if (combination && combination.描述) {
+                    logDebug(`找到风格描述: ${combination.描述}`);
+                } else {
+                    logDebug(`警告: 未找到风格描述`);
+                }
+            }
+        }
+
+        function updateWindowVarsStatus() {
+            const hasVoiceCombinations = !!(window.voiceCombinations && Object.keys(window.voiceCombinations).length > 0);
+            const hasFilteredCombinations = !!(window.filteredVoiceCombinations && Object.keys(window.filteredVoiceCombinations).length > 0);
+
+            document.getElementById('voice-combinations-status').textContent =
+                hasVoiceCombinations ? `已初始化 (${Object.keys(window.voiceCombinations).length} 个性别)` : '未初始化';
+            document.getElementById('filtered-combinations-status').textContent =
+                hasFilteredCombinations ? `已初始化 (${Object.keys(window.filteredCombinations).length} 个组合)` : '未初始化';
+        }
+
+        function logDebug(message, data) {
+            if (data) {
+                console.log(message, data);
+            } else {
+                console.log(message);
+            }
+        }
+
+        // 页面加载完成后的初始化
+        window.addEventListener('load', () => {
+            logDebug('调试页面已加载');
+            updateWindowVarsStatus();
+        });
+    </script>
+</body>
+</html>

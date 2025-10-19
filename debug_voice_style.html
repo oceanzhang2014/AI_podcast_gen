@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调试声音风格选项</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>调试声音风格选项</h2>
+
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label">性别</label>
+                <select class="form-select" id="gender-select">
+                    <option value="">选择性别</option>
+                    <option value="男性">男性</option>
+                    <option value="女性">女性</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">年龄</label>
+                <select class="form-select" id="age-select">
+                    <option value="">请先选择性别</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">声音风格</label>
+                <select class="form-select" id="style-select">
+                    <option value="">请先选择性别和年龄</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <h5>调试信息</h5>
+            <div id="debug-info" class="border p-3 bg-light"></div>
+        </div>
+
+        <div class="mt-3">
+            <h5>API测试</h5>
+            <button class="btn btn-primary" onclick="testAPI()">测试API</button>
+            <div id="api-result" class="mt-2 border p-3 bg-light"></div>
+        </div>
+    </div>
+
+    <script>
+        let debugData = {
+            voiceCombinations: {},
+            filteredVoiceCombinations: {}
+        };
+
+        function log(message) {
+            const debugInfo = document.getElementById('debug-info');
+            debugInfo.innerHTML += '<p>' + new Date().toLocaleTimeString() + ': ' + message + '</p>';
+            console.log(message);
+        }
+
+        // 性别选择变化
+        document.getElementById('gender-select').onchange = async function() {
+            const gender = this.value;
+            const ageSelect = document.getElementById('age-select');
+            const styleSelect = document.getElementById('style-select');
+
+            log('性别选择: ' + gender);
+
+            // 清空选项
+            ageSelect.innerHTML = '<option value="">选择年龄</option>';
+            styleSelect.innerHTML = '<option value="">请先选择年龄</option>';
+
+            if (!gender) return;
+
+            try {
+                // 调用API
+                const genderForApi = gender === '男性' ? 'male' : 'female';
+                log('调用API: /api/voice-combinations/' + genderForApi);
+
+                const response = await fetch(`/api/voice-combinations/${genderForApi}`);
+                const data = await response.json();
+
+                log('API响应状态: ' + response.status);
+                log('API响应数据: ' + JSON.stringify(data, null, 2));
+
+                if (data.success && data.data && data.data.combinations) {
+                    const combinations = data.data.combinations;
+                    log('组合数量: ' + combinations.length);
+
+                    // 获取唯一年龄
+                    const ages = new Set();
+                    combinations.forEach(comb => {
+                        if (comb.年龄) {
+                            ages.add(comb.年龄);
+                            log('找到年龄: ' + comb.年龄);
+                        }
+                    });
+
+                    // 填充年龄选项
+                    Array.from(ages).sort().forEach(age => {
+                        ageSelect.innerHTML += `<option value="${age}">${age}</option>`;
+                        log('添加年龄选项: ' + age);
+                    });
+
+                    // 存储格式化数据
+                    const formattedCombinations = combinations.map(comb => ({
+                        风格: comb.风格,
+                        年龄: comb.年龄,
+                        年龄显示: comb.年龄,
+                        描述: comb.描述 && comb.描述[0] ? comb.描述[0] : '',
+                        风格描述: comb.描述 && comb.描述[0] ? comb.描述[0] : ''
+                    }));
+
+                    debugData.voiceCombinations[gender] = formattedCombinations;
+                    log('存储到 voiceCombinations[' + gender + ']: ' + JSON.stringify(formattedCombinations, null, 2));
+
+                } else {
+                    log('API调用失败: ' + (data.error || '未知错误'));
+                }
+            } catch (error) {
+                log('API调用异常: ' + error.message);
+            }
+        };
+
+        // 年龄选择变化
+        document.getElementById('age-select').onchange = function() {
+            const gender = document.getElementById('gender-select').value;
+            const age = this.value;
+            const styleSelect = document.getElementById('style-select');
+
+            log('年龄选择: ' + age + ' (性别: ' + gender + ')');
+
+            styleSelect.innerHTML = '<option value="">选择声音风格</option>';
+
+            if (!gender || !age) return;
+
+            log('检查 voiceCominations[' + gender + '] 存在: ' + !!(debugData.voiceCombinations[gender]));
+
+            if (debugData.voiceCombinations && debugData.voiceCombinations[gender]) {
+                const combinations = debugData.voiceCombinations[gender];
+                log('可用组合数量: ' + combinations.length);
+
+                const filteredCombinations = combinations.filter(comb => {
+                    const match = (comb.年龄显示 === age || comb.年龄 === age);
+                    if (match) {
+                        log('匹配组合: ' + JSON.stringify(comb));
+                    }
+                    return match;
+                });
+
+                log('筛选后组合数量: ' + filteredCombinations.length);
+
+                // 获取唯一风格
+                const styles = new Set();
+                filteredCombinations.forEach(comb => {
+                    if (comb.风格) {
+                        styles.add(comb.风格);
+                        log('找到风格: ' + comb.风格);
+                    }
+                });
+
+                log('唯一风格数量: ' + styles.size);
+
+                // 填充风格选项
+                Array.from(styles).sort().forEach(style => {
+                    styleSelect.innerHTML += `<option value="${style}">${style}</option>`;
+                    log('添加风格选项: ' + style);
+                });
+
+                // 存储筛选后的组合
+                debugData.filteredVoiceCombinations[`${gender}_${age}`] = filteredCombinations;
+                log('存储到 filteredVoiceCombinations[' + gender + '_' + age + ']');
+
+            } else {
+                log('没有找到 voiceCombinations 数据');
+            }
+        };
+
+        // 测试API
+        async function testAPI() {
+            const apiResult = document.getElementById('api-result');
+            try {
+                const response = await fetch('/api/voice-combinations/male');
+                const data = await response.json();
+                apiResult.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                apiResult.innerHTML = '错误: ' + error.message;
+            }
+        }
+
+        // 初始化
+        log('调试页面已加载');
+    </script>
+</body>
+</html>
