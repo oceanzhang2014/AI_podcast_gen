@@ -6,15 +6,44 @@ echo           Git 保存脚本
 echo ========================================
 echo.
 
-:: 检查Git是否安装
-git --version >nul 2>&1
-if errorlevel 1 (
-    echo 错误: Git 未安装或未添加到系统路径!
+:: 检查Git是否安装，尝试常见路径并添加到PATH
+set GIT_FOUND=0
+if exist "D:\app\aidrawing\Git\mingw64\bin\git.exe" (
+    set PATH=D:\app\aidrawing\Git\mingw64\bin;%PATH%
+    set GIT_FOUND=1
+    echo 找到Git: D:\app\aidrawing\Git\mingw64\bin\git.exe
+) else if exist "C:\Program Files\Git\bin\git.exe" (
+    set PATH=C:\Program Files\Git\bin;%PATH%
+    set GIT_FOUND=1
+    echo 找到Git: C:\Program Files\Git\bin\git.exe
+) else if exist "C:\Program Files (x86)\Git\bin\git.exe" (
+    set PATH=C:\Program Files (x86)\Git\bin;%PATH%
+    set GIT_FOUND=1
+    echo 找到Git: C:\Program Files (x86)\Git\bin\git.exe
+) else (
+    git --version >nul 2>&1
+    if not errorlevel 1 (
+        set GIT_FOUND=1
+        echo Git已在系统PATH中找到
+    )
+)
+
+if "%GIT_FOUND%"=="0" (
+    echo 错误: Git 未安装或未找到!
     echo 请先安装 Git: https://git-scm.com/
+    echo.
+    echo 或检查以下路径是否包含Git:
+    echo - D:\app\aidrawing\Git\mingw64\bin\git.exe
+    echo - C:\Program Files\Git\bin\git.exe
+    echo - C:\Program Files (x86)\Git\bin\git.exe
     echo.
     pause
     exit /b 1
 )
+
+echo Git版本信息:
+git --version
+echo.
 
 :: 设置工作目录
 cd /d "%~dp0.."
