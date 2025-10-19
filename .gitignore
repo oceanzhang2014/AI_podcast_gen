@@ -60,7 +60,7 @@ static/audio/*.ogg
 static/audio/*.m4a
 static/audio/*.flac
 !static/audio/.gitkeep
-
+generated_audio/
 # Logs
 *.log
 logs/
