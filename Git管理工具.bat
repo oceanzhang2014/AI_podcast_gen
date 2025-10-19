@@ -22,7 +22,7 @@ if "%1"=="save" (
     echo ========================================
     echo.
     if exist "gitcode\git_save.bat" (
-        call "gitcode\git_save.bat" %2
+        cmd /c "gitcode\git_save.bat" %2
     ) else (
         echo 错误: git_save.bat 文件不存在!
     )
@@ -32,7 +32,7 @@ if "%1"=="save" (
 
 :: 运行Git管理工具
 if exist "gitcode\git_manager.bat" (
-    call "gitcode\git_manager.bat"
+    cmd /c "gitcode\git_manager.bat"
 ) else (
     echo 错误: git_manager.bat 文件不存在!
     pause

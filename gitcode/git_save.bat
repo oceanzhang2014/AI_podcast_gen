@@ -1,26 +1,36 @@
 @echo off
-setlocal enabledelayedexpansion
 chcp 65001 >nul
 echo ========================================
 echo           Git 保存脚本
 echo ========================================
 echo.
 
+:: 添加调试信息
+echo 脚本开始执行...
+echo 脚本位置: %~dp0
+echo 当前目录: %CD%
+echo.
+
 :: 检查Git是否安装，尝试常见路径并添加到PATH
 set GIT_FOUND=0
+set GIT_EXE_PATH=
+
+echo 正在查找Git安装...
+
 if exist "D:\app\aidrawing\Git\mingw64\bin\git.exe" (
-    set PATH=D:\app\aidrawing\Git\mingw64\bin;%PATH%
+    set GIT_EXE_PATH=D:\app\aidrawing\Git\mingw64\bin\git.exe
     set GIT_FOUND=1
     echo 找到Git: D:\app\aidrawing\Git\mingw64\bin\git.exe
 ) else if exist "C:\Program Files\Git\bin\git.exe" (
-    set PATH=C:\Program Files\Git\bin;%PATH%
+    set GIT_EXE_PATH=C:\Program Files\Git\bin\git.exe
     set GIT_FOUND=1
     echo 找到Git: C:\Program Files\Git\bin\git.exe
 ) else if exist "C:\Program Files (x86)\Git\bin\git.exe" (
-    set PATH=C:\Program Files (x86)\Git\bin;%PATH%
+    set GIT_EXE_PATH=C:\Program Files (x86)\Git\bin\git.exe
     set GIT_FOUND=1
     echo 找到Git: C:\Program Files (x86)\Git\bin\git.exe
 ) else (
+    echo 尝试使用系统PATH中的git...
     git --version >nul 2>&1
     if not errorlevel 1 (
         set GIT_FOUND=1
@@ -37,7 +47,8 @@ if "%GIT_FOUND%"=="0" (
     echo - C:\Program Files\Git\bin\git.exe
     echo - C:\Program Files (x86)\Git\bin\git.exe
     echo.
-    pause
+    echo 按任意键退出...
+    pause >nul
     exit /b 1
 )
 
@@ -110,12 +121,20 @@ if errorlevel 1 (
 
 echo.
 echo 推送到远程仓库...
-git push -u origin main
+
+:: 获取当前分支名称
+for /f "tokens=*" %%i in ('git branch --show-current 2^>nul') do set current_branch=%%i
+if "%current_branch%"=="" set current_branch=master
+
+echo 当前分支: %current_branch%
+
+:: 尝试推送到当前分支
+git push -u origin %current_branch%
 
 if errorlevel 1 (
     echo.
     echo 推送失败，尝试强制推送...
-    git push -f origin main
+    git push -f origin %current_branch%
     if errorlevel 1 (
         echo.
         echo 错误: 推送失败! 可能的原因:
@@ -128,6 +147,9 @@ if errorlevel 1 (
         echo - 是否有GitHub访问权限
         echo - 远程仓库地址是否正确
         echo.
+        echo 当前分支: %current_branch%
+        echo 远程仓库: origin
+        echo.
     )
 )
 
@@ -137,5 +159,8 @@ echo           操作完成!
 echo ========================================
 echo 当前工作目录: %CD%
 echo 远程仓库: https://github.com/oceanzhang2014/AI_podcast_gen.git
+echo 分支: %current_branch%
 echo.
-pause
+echo 按任意键退出...
+pause >nul
+echo 脚本执行完毕。

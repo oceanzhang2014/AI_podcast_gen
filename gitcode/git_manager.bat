@@ -43,28 +43,28 @@ goto main_menu
 :save_and_push
 echo.
 echo 执行保存并推送操作...
-call "%~dp0git_save.bat"
+cmd /c "%~dp0git_save.bat"
 pause
 goto main_menu
 
 :rollback
 echo.
 echo 执行版本回退操作...
-call "%~dp0git_rollback.bat"
+cmd /c "%~dp0git_rollback.bat"
 pause
 goto main_menu
 
 :push_only
 echo.
 echo 执行推送操作...
-call "%~dp0git_push.bat"
+cmd /c "%~dp0git_push.bat"
 pause
 goto main_menu
 
 :check_status
 echo.
 echo 查看Git状态...
-call "%~dp0git_status.bat"
+cmd /c "%~dp0git_status.bat"
 pause
 goto main_menu
 
