@@ -1,0 +1,97 @@
+{
+  "声音偏好": {
+    "文学风格": {
+      "description": "知性文雅，适合朗读文学作品"
+    },
+    "温柔风格": {
+      "description": "温和柔软，亲切自然"
+    },
+    "专业风格": {
+      "description": "专业稳重，适合正式场合"
+    },
+    "港式风格": {
+      "description": "港式发音，独特魅力"
+    },
+    "深沉风格": {
+      "description": "低沉有力，权威感强"
+    },
+    "情感风格": {
+      "description": "情感丰富，表现力强"
+    },
+    "深情风格": {
+      "description": "深情动人，温暖感人"
+    },
+    "清澈风格": {
+      "description": "清澈纯净，清晰明亮"
+    },
+    "平静风格": {
+      "description": "平静宁静，安详舒适"
+    }
+  },
+
+  "性别选项": {
+    "male": "男性",
+    "female": "女性"
+  },
+  "年龄选项": {
+    "年轻": "年轻",
+    "中年": "中年",
+    "其他": "其他"
+  },
+  "种子对照表": {
+    "2": {
+      "gender": "female",
+      "age": "年轻",
+      "style": "情感风格",
+      "description": "年轻女性 - 情感丰富"
+    },
+    "4": {
+      "gender": "female",
+      "age": "中年",
+      "style": "深情风格",
+      "description": "中年女性 - 深情动人"
+    },
+    "111": {
+      "gender": "male",
+      "age": "年轻",
+      "style": "文学风格",
+      "description": "年轻男性 - 文学气质"
+    },
+    "333": {
+      "gender": "female",
+      "age": "年轻",
+      "style": "温柔风格",
+      "description": "年轻女性 - 温柔体贴"
+    },
+    "666": {
+      "gender": "male",
+      "age": "中年",
+      "style": "专业风格",
+      "description": "中年男性 - 白领专业"
+    },
+    "7777": {
+      "gender": "male",
+      "age": "中年",
+      "style": "港式风格",
+      "description": "中年男性 - 港式风格"
+    },
+    "1111": {
+      "gender": "female",
+      "age": "中年",
+      "style": "清澈风格",
+      "description": "中年女性 - 清澈纯净"
+    },
+    "3333": {
+      "gender": "male",
+      "age": "中年",
+      "style": "平静风格",
+      "description": "中年女性 - 平静宁静"
+    },
+    "9999": {
+      "gender": "male",
+      "age": "中年",
+      "style": "深沉风格",
+      "description": "中年男性 - 深沉有力"
+    }
+  }
+}

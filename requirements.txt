@@ -1,0 +1,37 @@
+# Flask Web Framework
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# HTTP Requests
+requests==2.31.0
+
+# AI API Client Libraries
+openai==1.3.7
+deepseek-api==0.1.0
+
+# Text-to-Speech Libraries
+# ChatTTS for high-quality natural voice synthesis
+ChatTTS==0.1.6
+torch>=2.0.0
+torchaudio>=2.0.0
+transformers>=4.30.0
+accelerate>=0.20.0
+datasets>=2.10.0
+soundfile>=0.12.0
+
+# Alternative TTS options (fallback)
+gTTS==2.3.2
+pyttsx3==2.90
+
+# Utility Libraries
+python-dotenv==1.0.0
+python-dateutil==2.8.2
+
+# Audio Processing
+pydub==0.25.1
+
+# Input Validation and Security
+bleach==6.1.0
+
+# Error Handling and Logging
+colorlog==6.7.0

@@ -1,0 +1,220 @@
+/* Custom Styles for AI Podcast Generator */
+
+:root {
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+/* Header Styles */
+.display-4 {
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+.lead {
+    color: var(--secondary-color);
+    font-size: 1.1rem;
+}
+
+/* Card Styles */
+.card {
+    border: none;
+    border-radius: 12px;
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card-header {
+    border-radius: 12px 12px 0 0 !important;
+    font-weight: 600;
+}
+
+/* Form Styles */
+.form-label {
+    color: var(--dark-color);
+    margin-bottom: 0.5rem;
+}
+
+.form-control,
+.form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Character Configuration Styles */
+.character-card {
+    background-color: #fff;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.character-card:hover {
+    border-color: var(--primary-color);
+}
+
+.character-header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 0.5rem 1rem;
+    margin: -1rem -1rem 1rem -1rem;
+    border-radius: 6px 6px 0 0;
+    font-weight: 600;
+}
+
+/* Button Styles */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    border-radius: 8px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+    border-radius: 8px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+    border-color: var(--danger-color);
+    border-radius: 8px;
+}
+
+/* Progress Bar Styles */
+.progress {
+    height: 1.5rem;
+    border-radius: 8px;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+/* Audio Player Styles */
+audio {
+    outline: none;
+    border-radius: 8px;
+}
+
+audio::-webkit-media-controls-panel {
+    background-color: var(--light-color);
+    border-radius: 8px;
+}
+
+/* Status Message Styles */
+.status-message {
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid var(--info-color);
+    background-color: #e7f5ff;
+}
+
+.status-message.error {
+    border-left-color: var(--danger-color);
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-message.success {
+    border-left-color: var(--success-color);
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+/* Footer Styles */
+footer {
+    background-color: transparent;
+    border-top: 1px solid #dee2e6 !important;
+}
+
+/* Loading Spinner */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .display-4 {
+        font-size: 2rem;
+    }
+
+    .btn-lg {
+        padding: 0.5rem 1.5rem;
+        font-size: 1rem;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+/* Animation Classes */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

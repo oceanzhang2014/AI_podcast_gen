@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Configuration - AI Podcast Generator</title>
+    <meta name="description" content="Configure API keys and agent settings for AI-powered podcast generation">
+    <meta name="keywords" content="configuration, API keys, AI, settings, podcast generator">
+    <meta name="author" content="AI Podcast Generator">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    <!-- Configuration-specific styles -->
+    <style>
+        /* Enhanced form validation styling */
+        .api-key-input.is-valid {
+            border-color: var(--success-color) !important;
+            background-image: none;
+            padding-right: calc(1.5em + 0.75rem);
+            background-position: right calc(0.375em + 0.1875rem) center;
+            background-repeat: no-repeat;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
+
+        .api-key-input.is-invalid {
+            border-color: var(--danger-color) !important;
+            background-image: none;
+            padding-right: calc(1.5em + 0.75rem);
+            background-position: right calc(0.375em + 0.1875rem) center;
+            background-repeat: no-repeat;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
+
+        .api-key-input.is-valid:focus {
+            border-color: var(--success-color) !important;
+            box-shadow: 0 0 0 0.2rem rgba(16, 185, 129, 0.25) !important;
+        }
+
+        .api-key-input.is-invalid:focus {
+            border-color: var(--danger-color) !important;
+            box-shadow: 0 0 0 0.2rem rgba(239, 68, 68, 0.25) !important;
+        }
+
+        /* Enhanced validation status styling */
+        .validation-status .badge {
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease;
+        }
+
+        .validation-status .badge.bg-success {
+            background-color: var(--success-color) !important;
+            animation: fadeInScale 0.3s ease;
+        }
+
+        .validation-status .badge.bg-danger {
+            background-color: var(--danger-color) !important;
+            animation: shake 0.5s ease;
+        }
+
+        .validation-status .badge.bg-warning {
+            background-color: var(--warning-color) !important;
+            animation: pulse 1s ease infinite;
+        }
+
+        /* Enhanced card styling for API keys */
+        .api-key-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid var(--border-color);
+        }
+
+        .api-key-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .api-key-card.validated {
+            border-color: var(--success-color);
+        }
+
+        .api-key-card.error {
+            border-color: var(--danger-color);
+        }
+
+        /* Enhanced button styling */
+        .validate-api-btn {
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .validate-api-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .validate-api-btn:active {
+            transform: translateY(0);
+        }
+
+        .validate-api-btn.loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        /* Responsive improvements */
+        @media (max-width: 768px) {
+            .action-buttons .btn {
+                padding: 0.625rem 1rem;
+                font-size: 0.875rem;
+                border-radius: 0.375rem;
+            }
+
+            .api-key-card {
+                margin-bottom: 1rem;
+            }
+
+            .api-key-card .card-body {
+                padding: 1rem;
+            }
+
+            .api-key-card .card-header {
+                padding: 0.75rem 1rem;
+            }
+
+            .api-key-card .input-group .btn {
+                padding: 0.5rem 0.75rem;
+            }
+
+            .badge {
+                font-size: 0.625rem;
+                padding: 0.25rem 0.5rem;
+            }
+        }
+
+        /* Ultra-mobile optimization (≤480px) */
+        @media (max-width: 480px) {
+            .action-buttons .btn {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.8rem;
+            }
+
+            .api-key-card .card-body {
+                padding: 0.75rem;
+            }
+
+            .api-key-card .input-group {
+                flex-direction: column;
+            }
+
+            .api-key-card .input-group .form-control {
+                border-bottom-right-radius: 0.375rem;
+                border-top-right-radius: 0.375rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .api-key-card .input-group .btn {
+                border-radius: 0.375rem;
+                width: 100%;
+            }
+
+            .api-key-card .form-label {
+                font-size: 0.875rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .api-key-card .badge {
+                font-size: 0.6rem;
+                padding: 0.2rem 0.4rem;
+            }
+        }
+
+        /* Animation definitions */
+        @keyframes fadeInScale {
+            0% {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            10%, 30%, 50%, 70%, 90% {
+                transform: translateX(-2px);
+            }
+            20%, 40%, 60%, 80% {
+                transform: translateX(2px);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        /* Loading states */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.5rem;
+            z-index: 1000;
+        }
+
+        /* Enhanced focus states for accessibility */
+        .api-key-input:focus,
+        .validate-api-btn:focus,
+        .toggle-visibility-btn:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .api-key-card {
+                border-width: 3px;
+            }
+
+            .api-key-input {
+                border-width: 2px;
+            }
+
+            .validate-api-btn {
+                border-width: 2px;
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .api-key-card,
+            .validate-api-btn,
+            .validation-status .badge {
+                transition: none;
+                animation: none;
+            }
+        }
+    </style>
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="API Configuration - AI Podcast Generator">
+    <meta property="og:description" content="Configure API keys and agent settings for AI podcast generation">
+    <meta property="og:type" content="website">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,">
+</head>
+<body>
+    <div class="container mt-4">
+        <header class="text-center mb-5">
+            <div class="mb-3">
+                <i class="bi bi-gear-fill text-primary" style="font-size: 3rem;"></i>
+            </div>
+            <h1 class="display-4">API Configuration</h1>
+            <p class="lead">Configure API keys and agent settings for AI-powered podcast generation</p>
+            <div class="row justify-content-center mt-4">
+                <div class="col-md-8">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+                            <p class="mb-0">
+                                <i class="bi bi-shield-check text-info me-2"></i>
+                                Your API keys are encrypted and stored securely. Configure providers and assign models to different agents for enhanced podcast generation.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb justify-content-center">
+                <li class="breadcrumb-item">
+                    <a href="{{ url_for('index') }}">
+                        <i class="bi bi-house me-1"></i>Home
+                    </a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">
+                    <i class="bi bi-gear me-1"></i>Configuration
+                </li>
+            </ol>
+        </nav>
+
+        <main>
+            <!-- Configuration Form -->
+            <section id="config-form" class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="h4 mb-0">
+                        <i class="bi bi-key-fill me-2"></i>API Key Configuration
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form id="configForm">
+                        <!-- API Keys Section -->
+                        <div class="mb-4 mb-md-5">
+                            <h3 class="h5 fw-bold mb-3">
+                                <i class="bi bi-key me-2"></i>API Keys
+                                <span class="badge bg-success ms-2" id="api-keys-status">
+                                    <i class="bi bi-circle-fill me-1"></i>Not Configured
+                                </span>
+                            </h3>
+                            <div class="alert alert-info mb-4">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Security Notice:</strong> Your API keys are encrypted using AES-256 encryption and stored securely. They are never exposed in the browser.
+                            </div>
+
+                            <!-- API Key Cards for better mobile experience -->
+                            <div class="row g-3 g-md-4">
+                                <!-- DeepSeek API Key Card -->
+                                <div class="col-12 col-lg-4">
+                                    <div class="card border h-100 api-key-card" id="deepseek-card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0 fw-bold">
+                                                <i class="bi bi-robot text-primary me-2"></i>DeepSeek
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label for="deepseek-api-key" class="form-label fw-bold small">
+                                                    API Key
+                                                </label>
+                                                <div class="input-group">
+                                                    <input type="password"
+                                                           class="form-control api-key-input"
+                                                           id="deepseek-api-key"
+                                                           name="api_keys.deepseek"
+                                                           placeholder="sk-..."
+                                                           autocomplete="off"
+                                                           aria-describedby="deepseek-help deepseek-error"
+                                                           required>
+                                                    <button class="btn btn-outline-secondary toggle-visibility-btn"
+                                                            type="button"
+                                                            data-bs-toggle="tooltip"
+                                                            data-bs-placement="top"
+                                                            title="Toggle visibility"
+                                                            data-input-id="deepseek-api-key">
+                                                        <i class="bi bi-eye toggle-icon"></i>
+                                                    </button>
+                                                </div>
+                                                <div id="deepseek-help" class="form-text">
+                                                    <a href="https://platform.deepseek.com" target="_blank" class="text-decoration-none small">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i>Get API Key
+                                                    </a>
+                                                </div>
+                                                <div id="deepseek-error" class="invalid-feedback">
+                                                    Please enter a valid DeepSeek API key
+                                                </div>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="flex-grow-1">
+                                                    <small class="text-muted">Validation:</small>
+                                                    <div id="deepseek-validation" class="validation-status mt-1">
+                                                        <span class="badge bg-secondary">
+                                                            <i class="bi bi-dash-circle me-1"></i>Not Validated
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="ms-2">
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-sm validate-api-btn w-100"
+                                                            data-provider="deepseek"
+                                                            data-input-id="deepseek-api-key">
+                                                        <i class="bi bi-check-circle me-1"></i>Validate
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- BigModel API Key Card -->
+                                <div class="col-12 col-lg-4">
+                                    <div class="card border h-100 api-key-card" id="bigmodel-card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0 fw-bold">
+                                                <i class="bi bi-robot text-info me-2"></i>BigModel
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label for="bigmodel-api-key" class="form-label fw-bold small">
+                                                    API Key
+                                                </label>
+                                                <div class="input-group">
+                                                    <input type="password"
+                                                           class="form-control api-key-input"
+                                                           id="bigmodel-api-key"
+                                                           name="api_keys.bigmodel"
+                                                           placeholder="..."
+                                                           autocomplete="off"
+                                                           aria-describedby="bigmodel-help bigmodel-error"
+                                                           required>
+                                                    <button class="btn btn-outline-secondary toggle-visibility-btn"
+                                                            type="button"
+                                                            data-bs-toggle="tooltip"
+                                                            data-bs-placement="top"
+                                                            title="Toggle visibility"
+                                                            data-input-id="bigmodel-api-key">
+                                                        <i class="bi bi-eye toggle-icon"></i>
+                                                    </button>
+                                                </div>
+                                                <div id="bigmodel-help" class="form-text">
+                                                    <a href="https://open.bigmodel.cn" target="_blank" class="text-decoration-none small">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i>Get API Key
+                                                    </a>
+                                                </div>
+                                                <div id="bigmodel-error" class="invalid-feedback">
+                                                    Please enter a valid BigModel API key
+                                                </div>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="flex-grow-1">
+                                                    <small class="text-muted">Validation:</small>
+                                                    <div id="bigmodel-validation" class="validation-status mt-1">
+                                                        <span class="badge bg-secondary">
+                                                            <i class="bi bi-dash-circle me-1"></i>Not Validated
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="ms-2">
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-sm validate-api-btn w-100"
+                                                            data-provider="bigmodel"
+                                                            data-input-id="bigmodel-api-key">
+                                                        <i class="bi bi-check-circle me-1"></i>Validate
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- OpenAI API Key Card -->
+                                <div class="col-12 col-lg-4">
+                                    <div class="card border h-100 api-key-card" id="openai-card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0 fw-bold">
+                                                <i class="bi bi-robot text-success me-2"></i>OpenAI
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label for="openai-api-key" class="form-label fw-bold small">
+                                                    API Key
+                                                </label>
+                                                <div class="input-group">
+                                                    <input type="password"
+                                                           class="form-control api-key-input"
+                                                           id="openai-api-key"
+                                                           name="api_keys.openai"
+                                                           placeholder="sk-..."
+                                                           autocomplete="off"
+                                                           aria-describedby="openai-help openai-error"
+                                                           required>
+                                                    <button class="btn btn-outline-secondary toggle-visibility-btn"
+                                                            type="button"
+                                                            data-bs-toggle="tooltip"
+                                                            data-bs-placement="top"
+                                                            title="Toggle visibility"
+                                                            data-input-id="openai-api-key">
+                                                        <i class="bi bi-eye toggle-icon"></i>
+                                                    </button>
+                                                </div>
+                                                <div id="openai-help" class="form-text">
+                                                    <a href="https://platform.openai.com" target="_blank" class="text-decoration-none small">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i>Get API Key
+                                                    </a>
+                                                </div>
+                                                <div id="openai-error" class="invalid-feedback">
+                                                    Please enter a valid OpenAI API key
+                                                </div>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="flex-grow-1">
+                                                    <small class="text-muted">Validation:</small>
+                                                    <div id="openai-validation" class="validation-status mt-1">
+                                                        <span class="badge bg-secondary">
+                                                            <i class="bi bi-dash-circle me-1"></i>Not Validated
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="ms-2">
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-sm validate-api-btn w-100"
+                                                            data-provider="openai"
+                                                            data-input-id="openai-api-key">
+                                                        <i class="bi bi-check-circle me-1"></i>Validate
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Agent Configuration Section -->
+                        <div class="mb-5">
+                            <h3 class="h5 fw-bold mb-3">
+                                <i class="bi bi-person-badge me-2"></i>Agent Configuration
+                                <span class="badge bg-primary ms-2" id="agent-count">
+                                    <i class="bi bi-people me-1"></i>0 Agents
+                                </span>
+                            </h3>
+                            <div class="alert alert-info mb-4">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Agent Configuration:</strong> Assign different AI models to specific agents for specialized podcast generation capabilities.
+                            </div>
+
+                            <div id="agent-config-container">
+                                <!-- Agent configurations will be dynamically added here -->
+                            </div>
+
+                            <div class="text-center mt-3">
+                                <button type="button" class="btn btn-outline-success" id="add-agent-btn">
+                                    <i class="bi bi-plus-circle me-2"></i>Add Agent Configuration
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="action-buttons">
+                            <!-- Primary Actions - Desktop Layout -->
+                            <div class="d-none d-md-flex justify-content-between align-items-center">
+                                <div>
+                                    <button type="button" class="btn btn-outline-warning me-2" id="export-config-btn">
+                                        <i class="bi bi-download me-2"></i>Export
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info" id="import-config-btn">
+                                        <i class="bi bi-upload me-2"></i>Import
+                                    </button>
+                                </div>
+                                <div>
+                                    <button type="button" class="btn btn-outline-danger me-2" id="clear-config-btn">
+                                        <i class="bi bi-trash me-2"></i>Clear All
+                                    </button>
+                                    <button type="submit" class="btn btn-primary btn-lg" id="save-config-btn">
+                                        <span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
+                                        <i class="bi bi-save me-2"></i>Save Configuration
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Mobile Layout - Stacked -->
+                            <div class="d-md-none">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-warning w-100" id="export-config-btn-mobile">
+                                            <i class="bi bi-download me-1"></i>Export
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-info w-100" id="import-config-btn-mobile">
+                                            <i class="bi bi-upload me-1"></i>Import
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-danger w-100" id="clear-config-btn-mobile">
+                                            <i class="bi bi-trash me-1"></i>Clear All
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="submit" class="btn btn-primary w-100" id="save-config-btn-mobile">
+                                            <span class="spinner-border spinner-border-sm d-none me-1" role="status" aria-hidden="true"></span>
+                                            <i class="bi bi-save me-1"></i>Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Status Messages -->
+            <section id="status-section" class="mt-4">
+                <!-- Success/Error messages will be displayed here -->
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center mt-5 py-3 border-top">
+            <div class="row align-items-center">
+                <div class="col-md-4 text-start">
+                    <small class="text-muted">
+                        <i class="bi bi-shield-check me-1"></i>
+                        Your data is encrypted and secure
+                    </small>
+                </div>
+                <div class="col-md-4">
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-gear me-1"></i>
+                        API Configuration - AI Podcast Generator
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <small class="text-muted">
+                        <a href="{{ url_for('index') }}" class="text-decoration-none">
+                            <i class="bi bi-house me-1"></i>Back to Generator
+                        </a>
+                    </small>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Import Configuration Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importModalLabel">
+                        <i class="bi bi-upload me-2"></i>Import Configuration
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="importForm">
+                        <div class="mb-3">
+                            <label for="importKey" class="form-label">Import Key</label>
+                            <input type="text" class="form-control" id="importKey" placeholder="Enter your import key">
+                            <div class="form-text">
+                                Enter the import key that was provided when you exported your configuration.
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="importData" class="form-label">Encrypted Configuration Data</label>
+                            <textarea class="form-control" id="importData" rows="5" placeholder="Paste the encrypted configuration data here..."></textarea>
+                            <div class="form-text">
+                                Paste the complete encrypted configuration data from your export.
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmImportBtn">
+                        <i class="bi bi-upload me-2"></i>Import Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Configuration Modal -->
+    <div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exportModalLabel">
+                        <i class="bi bi-download me-2"></i>Export Configuration
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Important:</strong> Save both the export key and encrypted data securely. You will need both to import your configuration later.
+                    </div>
+                    <div class="mb-3">
+                        <label for="exportKey" class="form-label">Export Key</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="exportKey" readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="copyKeyBtn">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Save this key securely - you'll need it to import your configuration.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="exportData" class="form-label">Encrypted Configuration Data</label>
+                        <div class="input-group">
+                            <textarea class="form-control" id="exportData" rows="5" readonly></textarea>
+                            <button class="btn btn-outline-secondary" type="button" id="copyDataBtn">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Copy this encrypted data and save it with your export key.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Configuration JavaScript -->
+    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+</body>
+</html>

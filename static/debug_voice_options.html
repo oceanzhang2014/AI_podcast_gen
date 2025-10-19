@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>声音选项调试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        select { margin: 10px 0; padding: 5px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>声音选项动态加载调试</h1>
+
+    <div class="debug-section">
+        <h2>测试角色配置</h2>
+        <div>
+            <label>性别：</label>
+            <select id="gender" onchange="updateAgeOptions()">
+                <option value="">选择性别</option>
+                <option value="男性">男性</option>
+                <option value="女性">女性</option>
+            </select>
+        </div>
+        <div>
+            <label>年龄：</label>
+            <select id="age" onchange="updateStyleOptions()">
+                <option value="">请先选择性别</option>
+            </select>
+        </div>
+        <div>
+            <label>声音风格：</label>
+            <select id="style">
+                <option value="">请先选择性别和年龄</option>
+            </select>
+        </div>
+        <div>
+            <label>风格描述：</label>
+            <div id="style-description"></div>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h2>调试日志</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let voiceData = null;
+
+        function log(message, isError = false) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = isError ? 'error' : 'success';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function loadVoicePreferences() {
+            try {
+                log('开始加载声音偏好数据...');
+                const response = await fetch('/api/all-voice-combinations');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                log(`API响应成功: ${result.success ? '成功' : '失败'}`);
+
+                if (result.success) {
+                    voiceData = result.data;
+                    log(`数据加载完成，包含 ${Object.keys(voiceData).length} 个主要部分`);
+                    log(`年龄选项: ${JSON.stringify(voiceData.年龄选项)}`);
+                    log(`所有组合数量: ${voiceData.所有组合 ? voiceData.所有组合.length : 0}`);
+                    return voiceData;
+                } else {
+                    throw new Error(result.error || '未知错误');
+                }
+            } catch (error) {
+                log(`加载数据失败: ${error.message}`, true);
+                console.error('Load error:', error);
+                return null;
+            }
+        }
+
+        function updateAgeOptions() {
+            log('更新年龄选项...');
+
+            const genderSelect = document.getElementById('gender');
+            const ageSelect = document.getElementById('age');
+            const styleSelect = document.getElementById('style');
+
+            const selectedGender = genderSelect.value;
+            log(`选择的性别: ${selectedGender}`);
+
+            // 清空年龄选项
+            ageSelect.innerHTML = '<option value="">选择年龄</option>';
+            styleSelect.innerHTML = '<option value="">请先选择性别和年龄</option>';
+
+            if (!selectedGender) {
+                ageSelect.innerHTML = '<option value="">请先选择性别</option>';
+                return;
+            }
+
+            if (!voiceData) {
+                log('声音数据未加载，尝试重新加载...', true);
+                loadVoicePreferences().then(data => {
+                    if (data) {
+                        updateAgeOptions();
+                    }
+                });
+                return;
+            }
+
+            try {
+                if (voiceData.年龄选项) {
+                    Object.entries(voiceData.年龄选项).forEach(([key, value]) => {
+                        const option = document.createElement('option');
+                        option.value = value;
+                        option.textContent = value;
+                        ageSelect.appendChild(option);
+                    });
+                    log(`成功加载 ${Object.keys(voiceData.年龄选项).length} 个年龄选项`);
+                } else {
+                    log('年龄选项数据不存在', true);
+                }
+            } catch (error) {
+                log(`更新年龄选项失败: ${error.message}`, true);
+            }
+        }
+
+        function updateStyleOptions() {
+            log('更新声音风格选项...');
+
+            const genderSelect = document.getElementById('gender');
+            const ageSelect = document.getElementById('age');
+            const styleSelect = document.getElementById('style');
+            const descriptionDiv = document.getElementById('style-description');
+
+            const selectedGender = genderSelect.value;
+            const selectedAge = ageSelect.value;
+
+            log(`选择的条件: ${selectedGender} + ${selectedAge}`);
+
+            // 清空风格选项
+            styleSelect.innerHTML = '<option value="">选择声音风格</option>';
+            descriptionDiv.textContent = '';
+
+            if (!selectedGender || !selectedAge) {
+                styleSelect.innerHTML = '<option value="">请先选择性别和年龄</option>';
+                return;
+            }
+
+            if (!voiceData) {
+                log('声音数据未加载', true);
+                return;
+            }
+
+            try {
+                if (voiceData.所有组合) {
+                    const availableStyles = voiceData.所有组合.filter(combo =>
+                        combo.支持性别.includes(selectedGender) &&
+                        combo.年龄显示 === selectedAge
+                    );
+
+                    log(`找到 ${availableStyles.length} 个匹配的风格`);
+
+                    availableStyles.forEach(combo => {
+                        const option = document.createElement('option');
+                        option.value = combo.风格;
+                        option.textContent = combo.风格;
+                        option.dataset.description = combo.风格描述;
+                        styleSelect.appendChild(option);
+                        log(`添加风格选项: ${combo.风格} - ${combo.风格描述}`);
+                    });
+
+                    // 添加风格描述显示
+                    styleSelect.onchange = function() {
+                        if (this.value) {
+                            const selectedOption = this.options[this.selectedIndex];
+                            descriptionDiv.textContent = selectedOption.dataset.description || '';
+                            log(`选择风格: ${this.value} - ${selectedOption.dataset.description}`);
+                        } else {
+                            descriptionDiv.textContent = '';
+                        }
+                    };
+                } else {
+                    log('所有组合数据不存在', true);
+                }
+            } catch (error) {
+                log(`更新风格选项失败: ${error.message}`, true);
+            }
+        }
+
+        // 页面加载时初始化
+        window.onload = function() {
+            log('页面加载完成，开始初始化...');
+            loadVoicePreferences();
+        };
+    </script>
+</body>
+</html>
