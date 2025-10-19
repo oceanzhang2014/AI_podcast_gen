@@ -1080,7 +1080,7 @@ def _render_error_page(title: str, message: str, details: str = None, show_retry
 
 @app.route('/generate', methods=['POST'])
 @performance_monitoring
-@rate_limit(max_requests=5, window_seconds=300)  # 5 requests per 5 minutes
+@rate_limit(max_requests=20, window_seconds=60)  # 20 requests per 1 minute (more suitable for development)
 def generate_podcast():
     """
     Enhanced podcast generation endpoint with comprehensive error handling and monitoring.

@@ -144,7 +144,7 @@ class FileHandler:
 
     @handle_errors("save_audio_file")
     def save_audio_file(self, audio_data: bytes, topic: str,
-                       timestamp: Optional[datetime] = None) -> str:
+                       timestamp: Optional[datetime] = None, custom_filename: Optional[str] = None) -> str:
         """
         Save audio data to file with standardized naming.
 
@@ -152,6 +152,7 @@ class FileHandler:
             audio_data: Raw audio data in bytes
             topic: Topic for filename generation
             timestamp: Optional timestamp for filename
+            custom_filename: Optional custom filename (e.g., admin_timestamp format)
 
         Returns:
             Full path to saved file
@@ -171,7 +172,15 @@ class FileHandler:
             raise FileOperationError("Insufficient disk space to save audio file")
 
         # Generate filename
-        filename = self.generate_filename(topic, timestamp)
+        if custom_filename:
+            # Use custom filename (admin_timestamp format)
+            if not custom_filename.endswith('.wav'):
+                filename = f"{custom_filename}.wav"
+            else:
+                filename = custom_filename
+        else:
+            # Use standard filename generation
+            filename = self.generate_filename(topic, timestamp)
         file_path = self.output_dir / filename
 
         try:
@@ -485,7 +494,7 @@ def get_file_handler() -> FileHandler:
 
 # Convenience functions for common operations
 def save_audio_file(audio_data: bytes, topic: str,
-                   timestamp: Optional[datetime] = None) -> str:
+                   timestamp: Optional[datetime] = None, custom_filename: Optional[str] = None) -> str:
     """
     Save audio data to file with standardized naming.
 
@@ -493,11 +502,12 @@ def save_audio_file(audio_data: bytes, topic: str,
         audio_data: Raw audio data in bytes
         topic: Topic for filename generation
         timestamp: Optional timestamp for filename
+        custom_filename: Optional custom filename (e.g., admin_timestamp format)
 
     Returns:
         Full path to saved file
     """
-    return get_file_handler().save_audio_file(audio_data, topic, timestamp)
+    return get_file_handler().save_audio_file(audio_data, topic, timestamp, custom_filename)
 
 
 def generate_filename(topic: str, timestamp: Optional[datetime] = None) -> str:

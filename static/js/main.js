@@ -722,6 +722,15 @@ function handleTopicInput() {
 }
 
 /**
+ * Update topic counter display
+ */
+function updateTopicCounter() {
+    if (Elements.topicTextarea && Elements.topicCounter) {
+        handleTopicInput.call(Elements.topicTextarea);
+    }
+}
+
+/**
  * Handle generate button click
  */
 function handleGenerateClick() {
@@ -818,6 +827,18 @@ async function startGeneration() {
             showError('Generation timed out. Please try again with a simpler topic.');
         } else if (error.name === 'TypeError') {
             showError('Network error. Please check your internet connection and try again.');
+        } else if (error.message.includes('429') || error.message.includes('TOO MANY REQUESTS')) {
+            // Special handling for rate limit errors
+            if (AppState.retryCount < AppState.maxRetries) {
+                AppState.retryCount++;
+                const waitTime = Math.min(10000 * Math.pow(2, AppState.retryCount - 1), 60000); // Exponential backoff, max 60s
+                console.log(`Rate limit hit. Waiting ${waitTime/1000}s before retry (attempt ${AppState.retryCount}/${AppState.maxRetries})`);
+                showNotification(`API请求过于频繁，等待${waitTime/1000}秒后重试...`, 'warning');
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                return startGeneration();
+            } else {
+                showError('API请求频率过高，请稍后再试或检查API密钥配置');
+            }
         } else {
             showError('An unexpected error occurred. Please try again.');
         }
@@ -842,7 +863,9 @@ function shouldRetry(error) {
         'network',
         'temporary',
         'overloaded',
-        'rate limit'
+        'rate limit',
+        'too many requests',
+        '429'
     ];
 
     return retryableErrors.some(retryableError =>
@@ -2140,7 +2163,7 @@ function restoreSavedConfiguration(config) {
         // Restore participants and rounds
         if (config.participants && Elements.participantsSelect) {
             Elements.participantsSelect.value = config.participants;
-            updateCharacterConfig();
+            updateCharacterConfig(parseInt(config.participants) || 2);
         }
 
         if (config.rounds) {
