@@ -8,13 +8,13 @@ This change adds data persistence functionality to store and restore podcast gen
 
 ### Current State
 - No form data persistence
-- Generic audio file naming (`podcast_YYYYMMDD_HHMMSS.mp3`)
+- Generic audio file naming (`podcast_YYYYMMDD_HHMMSS.wav`)
 - No user-specific data association
 - Session-based API key storage only
 
 ### Target State
 - Automatic form data saving and restoration
-- User-specific audio file naming (`admin_YYYYMMDD_HHMMSS.mp3`)
+- User-specific audio file naming (`admin_YYYYMMDD_HHMMSS.wav`)
 - Default admin user for data association
 - Enhanced database schema for podcast configurations
 

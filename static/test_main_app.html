@@ -95,7 +95,7 @@
                         <div class="col-md-4">
                             <div class="d-grid gap-2">
                                 <a href="#" class="btn btn-success btn-lg" id="downloadBtn" download="">
-                                    <i class="bi bi-download me-2"></i>Download MP3
+                                    <i class="bi bi-download me-2"></i>Download
                                 </a>
                                 <button class="btn btn-outline-primary" id="newPodcastBtn" type="button">
                                     <i class="bi bi-plus-circle me-2"></i>Create New Podcast
@@ -265,7 +265,7 @@
         function generateFilename() {
             const topic = 'test-podcast';
             const timestamp = new Date().toISOString().slice(0, 10);
-            return `${topic}-${timestamp}.mp3`;
+            return `${topic}-${timestamp}.wav`;
         }
 
         function showNotification(message, type) {
@@ -350,10 +350,10 @@
             const mockResponse = {
                 success: true,
                 data: {
-                    audio_url: '/audio/podcast_20251019_094511.mp3',
-                    download_url: '/download/podcast_20251019_094511.mp3',
+                    audio_url: '/audio/podcast_20251019_094511.wav',
+                    download_url: '/download/podcast_20251019_094511.wav',
                     file_info: {
-                        filename: 'podcast_20251019_094511.mp3',
+                        filename: 'podcast_20251019_094511.wav',
                         size: 2708012,
                         created_at: new Date().toISOString()
                     }
@@ -378,8 +378,8 @@
 
         function showExistingAudio() {
             // 直接使用最新的音频文件
-            AppState.audioUrl = 'http://127.0.0.1:5000/audio/podcast_20251019_094511.mp3';
-            AppState.downloadUrl = 'http://127.0.0.1:5000/download/podcast_20251019_094511.mp3';
+            AppState.audioUrl = 'http://127.0.0.1:5000/audio/podcast_20251019_094511.wav';
+            AppState.downloadUrl = 'http://127.0.0.1:5000/download/podcast_20251019_094511.wav';
 
             showResultsSection();
             validateAndSetupAudio(AppState.audioUrl);

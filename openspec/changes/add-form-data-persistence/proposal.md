@@ -87,6 +87,6 @@ This change focuses on minimal, straightforward implementation:
 
 - Form data is automatically saved when podcast is generated
 - Page refresh restores previous form configuration
-- Audio files use `admin_YYYYMMDD_HHMMSS.mp3` naming
+- Audio files use `admin_YYYYMMDD_HHMMSS.wav` naming
 - Latest admin audio is automatically loaded on homepage
 - No impact on existing podcast generation functionality

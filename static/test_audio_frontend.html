@@ -46,7 +46,7 @@
             <div class="card-body">
                 <div class="d-grid gap-2">
                     <a href="#" class="btn btn-success btn-lg" id="downloadBtn" download="">
-                        <i class="bi bi-download me-2"></i>Download MP3
+                        <i class="bi bi-download me-2"></i>Download
                     </a>
                 </div>
             </div>
@@ -80,7 +80,7 @@
         };
 
         // 测试音频文件
-        const testAudioFile = 'podcast_20251019_094511.mp3';
+        const testAudioFile = 'podcast_20251019_094511.wav';
         const baseUrl = 'http://127.0.0.1:5000';
 
         // 复制我们修复的函数
@@ -286,7 +286,7 @@
         function generateFilename() {
             const topic = 'test-podcast';
             const timestamp = new Date().toISOString().slice(0, 10);
-            return `${topic}-${timestamp}.mp3`;
+            return `${topic}-${timestamp}.wav`;
         }
 
         function showNotification(message, type) {
@@ -318,8 +318,8 @@
         }
 
         function simulateError() {
-            AppState.audioUrl = `${baseUrl}/audio/nonexistent-file.mp3`;
-            AppState.downloadUrl = `${baseUrl}/download/nonexistent-file.mp3`;
+            AppState.audioUrl = `${baseUrl}/audio/nonexistent-file.wav`;
+            AppState.downloadUrl = `${baseUrl}/download/nonexistent-file.wav`;
 
             validateAndSetupAudio(AppState.audioUrl);
         }

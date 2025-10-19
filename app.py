@@ -713,9 +713,9 @@ class AudioFileService:
         if timestamp is None:
             timestamp = datetime.now()
 
-        # Format: admin_YYYYMMDD_HHMMSS.mp3
+        # Format: admin_YYYYMMDD_HHMMSS.wav
         timestamp_str = timestamp.strftime('%Y%m%d_%H%M%S')
-        return f"{username}_{timestamp_str}.mp3"
+        return f"{username}_{timestamp_str}.wav"
 
     @staticmethod
     def find_latest_user_audio(username):

@@ -1386,7 +1386,7 @@ function generateFilename() {
         .replace(/\s+/g, '-')
         .substring(0, 50);
     const timestamp = new Date().toISOString().slice(0, 10);
-    return `${sanitizedTopic}-${timestamp}.mp3`;
+    return `${sanitizedTopic}-${timestamp}.wav`;
 }
 
 /**

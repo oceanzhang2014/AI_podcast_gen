@@ -4,7 +4,10 @@
       "Bash(\"C:\\Program Files\\GitHub CLI\\gh.exe\":*)",
       "Bash(\"C:\\Program Files\\GitHub CLI\\gh.exe\" auth:*)",
       "Bash(del:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

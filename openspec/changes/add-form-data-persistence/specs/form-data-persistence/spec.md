@@ -47,7 +47,7 @@ The system SHALL generate audio files with user-specific naming conventions.
 #### Scenario: Admin user audio generation
 - GIVEN the admin user generates a podcast
 - WHEN the audio file is created
-- THEN the system SHALL name the file using the format `admin_YYYYMMDD_HHMMSS.mp3`
+- THEN the system SHALL name the file using the format `admin_YYYYMMDD_HHMMSS.wav`
 
 #### Scenario: Timestamp format consistency
 - GIVEN multiple audio files are generated
@@ -135,7 +135,7 @@ The system SHALL remove generic timestamp-only naming in favor of user-specific 
 #### Scenario: Legacy naming phase-out
 - GIVEN the new naming system is implemented
 - WHEN generating new audio files
-- THEN the system SHALL no longer use generic `podcast_YYYYMMDD_HHMMSS.mp3` format
+- THEN the system SHALL no longer use generic `podcast_YYYYMMDD_HHMMSS.wav` format
 
 ## Implementation Notes
 
@@ -150,8 +150,8 @@ The system SHALL remove generic timestamp-only naming in favor of user-specific 
 - Use consistent admin user identification across the system
 
 ### File Detection Algorithm
-1. Scan audio directory for files matching `{username}_*.mp3` pattern
-2. If no user files found, fall back to legacy `podcast_*.mp3` files
+1. Scan audio directory for files matching `{username}_*.wav` pattern
+2. If no user files found, fall back to legacy `podcast_*.wav` files
 3. Sort files by modification time
 4. Select the most recent file
 
