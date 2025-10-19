@@ -82,7 +82,7 @@ class AudioMergerService:
                 if not output_filename:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     thread_id = threading.get_ident()
-                    output_filename = f"podcast_{timestamp}_thread{thread_id}.{format}"
+                    output_filename = f"admin_{timestamp}_thread{thread_id}.{format}"
 
                 output_path = self.output_dir / output_filename
 

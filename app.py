@@ -557,6 +557,60 @@ class DatabaseManager:
                     )
                 ''')
 
+                # Create api_keys table for API key management
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS api_keys (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        provider TEXT NOT NULL,
+                        encrypted_key TEXT NOT NULL,
+                        key_mask TEXT NOT NULL,
+                        is_valid BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, provider)
+                    )
+                ''')
+
+                # Create agent_configs table for AI agent configurations
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS agent_configs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        provider TEXT NOT NULL,
+                        model TEXT NOT NULL,
+                        config_data TEXT NOT NULL,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, provider, model)
+                    )
+                ''')
+
+                # Create config_audit_log table for tracking configuration changes
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS config_audit_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        action TEXT NOT NULL,
+                        table_name TEXT NOT NULL,
+                        record_id INTEGER NOT NULL,
+                        old_values TEXT,
+                        new_values TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                # Create schema_version table for database migrations
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS schema_version (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        version INTEGER NOT NULL UNIQUE,
+                        description TEXT NOT NULL,
+                        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
                 # Create indexes for better performance
                 cursor.execute('''
                     CREATE INDEX IF NOT EXISTS idx_podcast_configs_user_id
@@ -566,6 +620,42 @@ class DatabaseManager:
                 cursor.execute('''
                     CREATE INDEX IF NOT EXISTS idx_podcast_configs_updated_at
                     ON podcast_configs (updated_at DESC)
+                ''')
+
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_api_keys_user_id
+                    ON api_keys (user_id)
+                ''')
+
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_api_keys_provider
+                    ON api_keys (provider)
+                ''')
+
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_api_keys_valid
+                    ON api_keys (is_valid)
+                ''')
+
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_agent_configs_user_id
+                    ON agent_configs (user_id)
+                ''')
+
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_config_audit_log_user_id
+                    ON config_audit_log (user_id)
+                ''')
+
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_config_audit_log_created_at
+                    ON config_audit_log (created_at)
+                ''')
+
+                # Insert initial schema version if not exists
+                cursor.execute('''
+                    INSERT OR IGNORE INTO schema_version (version, description)
+                    VALUES (1, 'Initial database schema for podcast configuration system')
                 ''')
 
                 conn.commit()
@@ -634,6 +724,31 @@ class PodcastConfigRepository:
                 ))
 
                 config_id = cursor.lastrowid
+
+                # Save API keys if provided
+                api_keys = config_data.get('api_keys', {})
+                if api_keys and isinstance(api_keys, dict):
+                    # Clear existing API keys for this user
+                    cursor.execute("DELETE FROM api_keys WHERE user_id = ?", (user_id,))
+
+                    # Insert new API keys
+                    for provider, api_key in api_keys.items():
+                        if api_key and api_key.strip():
+                            # Create a masked version for display
+                            key_mask = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
+
+                            cursor.execute('''
+                                INSERT INTO api_keys
+                                (user_id, provider, encrypted_key, key_mask, is_valid)
+                                VALUES (?, ?, ?, ?, ?)
+                            ''', (
+                                user_id,
+                                provider,
+                                api_key,  # For now, storing directly - could be encrypted in production
+                                key_mask,
+                                True  # Assume valid if provided
+                            ))
+
                 conn.commit()
 
                 logger.info(f"Saved podcast configuration with ID: {config_id}")
@@ -663,6 +778,19 @@ class PodcastConfigRepository:
                     result = dict(config)
                     # Parse JSON field
                     result['character_configs'] = json.loads(result['character_configs'])
+
+                    # Get API keys for this user
+                    cursor.execute('''
+                        SELECT provider, encrypted_key FROM api_keys
+                        WHERE user_id = ? AND is_valid = 1
+                    ''', (user_id,))
+
+                    api_keys = {}
+                    for api_key_row in cursor.fetchall():
+                        api_keys[api_key_row['provider']] = api_key_row['encrypted_key']
+
+                    result['api_keys'] = api_keys
+
                     logger.debug(f"Found latest config for user {user_id}")
                     return result
                 else:
@@ -998,6 +1126,57 @@ def index():
             template_context['download_url'] = None
             template_context['has_audio'] = False
 
+        # Load API keys for admin user (plaintext loading)
+        try:
+            from utils.database import get_database_manager
+            admin_session_id = "admin_admin"
+            logger.info(f"Loading API keys from admin session: '{admin_session_id}'")
+
+            # Load API keys directly from database in plaintext
+            with get_database_manager().get_connection() as conn:
+                # Get admin user ID
+                cursor = conn.execute(
+                    "SELECT id FROM users WHERE session_id = ?",
+                    (admin_session_id,)
+                )
+                admin_user_db = cursor.fetchone()
+
+                api_keys = {}
+                if admin_user_db:
+                    admin_user_id = admin_user_db['id']
+                    # Get API keys for admin user
+                    api_keys_result = conn.execute(
+                        """
+                        SELECT provider, encrypted_key, key_mask
+                        FROM api_keys
+                        WHERE user_id = ? AND is_valid = 1
+                        """,
+                        (admin_user_id,)
+                    ).fetchall()
+
+                    for api_key_row in api_keys_result:
+                        # Use the plaintext API key (stored in encrypted_key field)
+                        provider = api_key_row['provider']
+                        plaintext_key = api_key_row['encrypted_key']  # This now contains plaintext
+                        api_keys[provider] = plaintext_key
+
+                # Create masked version for display
+                masked_api_keys = {}
+                for provider, key in api_keys.items():
+                    if key and len(key) > 4:
+                        masked_api_keys[provider] = '*' * (len(key) - 4) + key[-4:]
+                    else:
+                        masked_api_keys[provider] = key
+
+                template_context['api_keys'] = masked_api_keys
+                template_context['has_api_keys'] = len(api_keys) > 0
+                logger.info(f"Loaded {len(api_keys)} API keys for admin user from database")
+
+        except Exception as e:
+            logger.warning(f"Error loading API keys: {str(e)}")
+            template_context['api_keys'] = {}
+            template_context['has_api_keys'] = False
+
         logger.info("Index page rendered successfully")
         return render_template('index.html', **template_context)
 
@@ -1077,6 +1256,251 @@ def _render_error_page(title: str, message: str, details: str = None, show_retry
         </body>
         </html>
         """
+
+
+@app.route('/api/podcast-config/save', methods=['POST'])
+@performance_monitoring
+@rate_limit(max_requests=30, window_seconds=60)
+def save_podcast_config():
+    """
+    Save podcast configuration for auto-save functionality.
+
+    Accepts JSON data with:
+    - topic: Podcast topic
+    - participants: Number of participants
+    - rounds: Number of conversation rounds
+    - ai_provider: AI provider name
+    - ai_model: AI model name
+    - character_configs: List of character configurations
+
+    Returns:
+        JSON response with saved configuration details
+    """
+    try:
+        # Validate request data
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'error': 'Request must be JSON',
+                'error_type': 'validation_error'
+            }), 400
+
+        data = request.get_json()
+
+        # Validate required fields
+        required_fields = ['topic', 'participants', 'rounds', 'ai_provider', 'ai_model', 'character_configs']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing required field: {field}',
+                    'error_type': 'validation_error'
+                }), 400
+
+        # Get or create admin user
+        admin_user = get_or_create_admin_user()
+
+        # Save configuration to database
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Insert or update podcast configuration
+            cursor.execute('''
+                INSERT OR REPLACE INTO podcast_configs
+                (user_id, topic, participants, rounds, ai_provider, ai_model, character_configs, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (
+                admin_user['id'],
+                data['topic'],
+                int(data['participants']),
+                int(data['rounds']),
+                data['ai_provider'],
+                data['ai_model'],
+                json.dumps(data['character_configs'])
+            ))
+
+            conn.commit()
+
+            # Get the saved configuration ID
+            config_id = cursor.lastrowid
+
+            logger.info(f"Podcast configuration saved for admin user: {admin_user['username']}, config_id: {config_id}")
+
+            return jsonify({
+                'success': True,
+                'message': 'Configuration saved successfully',
+                'config_id': config_id,
+                'saved_at': datetime.now().isoformat()
+            })
+
+    except ValueError as e:
+        logger.warning(f"Validation error in save_podcast_config: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Invalid data format',
+            'error_type': 'validation_error'
+        }), 400
+
+    except Exception as e:
+        logger.error(f"Error saving podcast configuration: {str(e)}")
+        log_exception(e, {'context': 'save_podcast_config'})
+        return jsonify({
+            'success': False,
+            'error': 'Failed to save configuration',
+            'error_type': 'server_error'
+        }), 500
+
+
+@app.route('/api/podcast-config/latest', methods=['GET'])
+@performance_monitoring
+@rate_limit(max_requests=60, window_seconds=60)
+def get_latest_podcast_config():
+    """
+    Get the latest saved podcast configuration.
+
+    Returns:
+        JSON response with the latest configuration or empty if none exists
+    """
+    try:
+        # Get admin user
+        admin_user = get_or_create_admin_user()
+
+        # Get latest configuration from database
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT topic, participants, rounds, ai_provider, ai_model, character_configs, created_at, updated_at
+                FROM podcast_configs
+                WHERE user_id = ?
+                ORDER BY updated_at DESC
+                LIMIT 1
+            ''', (admin_user['id'],))
+
+            result = cursor.fetchone()
+
+            if result:
+                config = {
+                    'topic': result['topic'],
+                    'participants': result['participants'],
+                    'rounds': result['rounds'],
+                    'ai_provider': result['ai_provider'],
+                    'ai_model': result['ai_model'],
+                    'character_configs': json.loads(result['character_configs']),
+                    'created_at': result['created_at'],
+                    'updated_at': result['updated_at']
+                }
+
+                logger.info(f"Retrieved latest podcast configuration for admin user: {admin_user['username']}")
+
+                return jsonify({
+                    'success': True,
+                    'has_config': True,
+                    'config': config
+                })
+            else:
+                logger.info(f"No podcast configuration found for admin user: {admin_user['username']}")
+
+                return jsonify({
+                    'success': True,
+                    'has_config': False,
+                    'config': None
+                })
+
+    except Exception as e:
+        logger.error(f"Error retrieving latest podcast configuration: {str(e)}")
+        log_exception(e, {'context': 'get_latest_podcast_config'})
+        return jsonify({
+            'success': False,
+            'error': 'Failed to retrieve configuration',
+            'error_type': 'server_error'
+        }), 500
+
+
+@app.route('/api/podcast-config/clear', methods=['POST'])
+@performance_monitoring
+@rate_limit(max_requests=10, window_seconds=60)
+def clear_podcast_config():
+    """
+    Clear all saved podcast configurations for the admin user.
+
+    Returns:
+        JSON response indicating success or failure
+    """
+    try:
+        # Get admin user
+        admin_user = get_or_create_admin_user()
+
+        # Clear configurations from database
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('DELETE FROM podcast_configs WHERE user_id = ?', (admin_user['id'],))
+            deleted_count = cursor.rowcount
+
+            conn.commit()
+
+            logger.info(f"Cleared {deleted_count} podcast configurations for admin user: {admin_user['username']}")
+
+            return jsonify({
+                'success': True,
+                'message': f'Cleared {deleted_count} saved configurations',
+                'deleted_count': deleted_count
+            })
+
+    except Exception as e:
+        logger.error(f"Error clearing podcast configurations: {str(e)}")
+        log_exception(e, {'context': 'clear_podcast_config'})
+        return jsonify({
+            'success': False,
+            'error': 'Failed to clear configurations',
+            'error_type': 'server_error'
+        }), 500
+
+
+def get_or_create_admin_user():
+    """
+    Get or create the admin user for podcast configuration management.
+
+    Returns:
+        Dict with user information
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Try to get existing admin user
+            cursor.execute('SELECT id, username, created_at FROM users WHERE username = ?', (ADMIN_USERNAME,))
+            result = cursor.fetchone()
+
+            if result:
+                return {
+                    'id': result['id'],
+                    'username': result['username'],
+                    'created_at': result['created_at']
+                }
+            else:
+                # Create new admin user
+                cursor.execute('''
+                    INSERT INTO users (username, created_at, updated_at)
+                    VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (ADMIN_USERNAME,))
+
+                user_id = cursor.lastrowid
+                conn.commit()
+
+                logger.info(f"Created new admin user: {ADMIN_USERNAME}")
+
+                return {
+                    'id': user_id,
+                    'username': ADMIN_USERNAME,
+                    'created_at': datetime.now().isoformat()
+                }
+
+    except Exception as e:
+        logger.error(f"Error getting or creating admin user: {str(e)}")
+        raise
+
 
 @app.route('/generate', methods=['POST'])
 @performance_monitoring
@@ -1177,7 +1601,7 @@ def generate_podcast():
                 'character_configs': [
                     {
                         'name': char.name,
-                        'gender': char.gender,
+                        'gender': char.gender.value if hasattr(char.gender, 'value') else str(char.gender),
                         'background': char.background,
                         'personality': char.personality,
                         'age': getattr(char, 'age', None),
@@ -1616,7 +2040,7 @@ def generate_podcast():
 
                 # Generate timestamp for output file
                 timestamp = datetime.now()
-                output_filename = f"podcast_{timestamp.strftime('%Y%m%d_%H%M%S')}.wav"
+                output_filename = f"admin_{timestamp.strftime('%Y%m%d_%H%M%S')}.wav"
 
                 logger.info(f"Merging {len(audio_segments)} audio segments into {output_filename}")
 
@@ -3100,18 +3524,59 @@ def configuration():
                     if not isinstance(api_keys, dict):
                         raise ValidationError("API keys must be a dictionary", field='api_keys')
 
-                    # Validate and save API keys
-                    for provider, api_key in api_keys.items():
-                        if api_key and api_key.strip():  # Only save non-empty keys
-                            if not config_service.validate_api_key(provider, api_key):
-                                raise ValidationError(
-                                    f"Invalid API key format for provider: {provider}",
-                                    field=f'api_keys.{provider}'
-                                )
+                    # Save API keys directly to admin_admin session in plaintext
+                    admin_session_id = "admin_admin"
+                    logger.info(f"Saving API keys to admin session: {admin_session_id}")
 
-                    success = config_service.save_api_keys(session_id, api_keys)
-                    if not success:
-                        raise ConfigurationError("Failed to save API keys")
+                    try:
+                        # Use direct database insertion for plaintext storage
+                        from utils.database import get_database_manager
+                        with get_database_manager().get_connection() as conn:
+                            # Get admin user ID
+                            cursor = conn.execute(
+                                "SELECT id FROM users WHERE session_id = ?",
+                                (admin_session_id,)
+                            )
+                            admin_user = cursor.fetchone()
+
+                            if not admin_user:
+                                # Create admin user if not exists
+                                cursor = conn.execute(
+                                    "INSERT INTO users (session_id) VALUES (?)",
+                                    (admin_session_id,)
+                                )
+                                admin_user_id = cursor.lastrowid
+                            else:
+                                admin_user_id = admin_user['id']
+
+                            # Delete existing API keys for admin
+                            conn.execute(
+                                "DELETE FROM api_keys WHERE user_id = ?",
+                                (admin_user_id,)
+                            )
+
+                            # Insert new API keys in plaintext
+                            for provider, api_key in api_keys.items():
+                                if api_key and api_key.strip():
+                                    # Store API key as plaintext in encrypted_key field
+                                    # Store last 4 chars as mask for display
+                                    key_mask = api_key.strip()[-4:] if len(api_key.strip()) > 4 else api_key.strip()
+
+                                    conn.execute(
+                                        """
+                                        INSERT INTO api_keys
+                                        (user_id, provider, encrypted_key, key_mask, is_valid)
+                                        VALUES (?, ?, ?, ?, ?)
+                                        """,
+                                        (admin_user_id, provider, api_key.strip(), key_mask, True)
+                                    )
+
+                            conn.commit()
+                            logger.info(f"Successfully saved {len(api_keys)} API keys to admin session")
+
+                    except Exception as e:
+                        logger.error(f"Failed to save API keys to database: {str(e)}")
+                        raise ConfigurationError(f"Failed to save API keys: {str(e)}")
 
                 # Process agent configurations if provided
                 if 'agent_configs' in data:
@@ -3721,99 +4186,6 @@ def import_configuration():
         }), 500
 
 
-@app.route('/save-config', methods=['POST'])
-@performance_monitoring
-@rate_limit(max_requests=30, window_seconds=60)
-def save_podcast_config():
-    """
-    Save podcast configuration for auto-save functionality.
-
-    Accepts POST data with form configuration and saves it to the database
-    for the current admin user.
-    """
-    try:
-        # Validate request data
-        if not request.is_json:
-            raise ValidationError("Request must be JSON", field='request_format')
-
-        data = request.get_json()
-        if not data:
-            raise ValidationError("No configuration data provided", field='request_body')
-
-        # Get admin user
-        admin_user = UserManager.get_or_create_admin_user()
-
-        # Validate required fields
-        required_fields = ['topic', 'participants', 'rounds']
-        for field in required_fields:
-            if field not in data or not str(data[field]).strip():
-                raise ValidationError(f"Missing required field: {field}", field=field)
-
-        # Validate data types
-        try:
-            participants = int(data['participants'])
-            rounds = int(data['rounds'])
-            if participants < 1 or participants > 10:
-                raise ValidationError("Participants must be between 1 and 10", field='participants')
-            if rounds < 1 or rounds > 20:
-                raise ValidationError("Rounds must be between 1 and 20", field='rounds')
-        except (ValueError, TypeError):
-            raise ValidationError("Invalid participants or rounds value", field='validation')
-
-        # Validate character configurations
-        character_configs = data.get('character_configs', [])
-        if not isinstance(character_configs, list):
-            raise ValidationError("Character configurations must be an array", field='character_configs')
-
-        if len(character_configs) != participants:
-            raise ValidationError(f"Expected {participants} character configurations, got {len(character_configs)}", field='character_configs')
-
-        # Prepare configuration data
-        config_data = {
-            'topic': str(data['topic']).strip(),
-            'participants': participants,
-            'rounds': rounds,
-            'ai_provider': data.get('ai_provider', 'deepseek'),
-            'ai_model': data.get('ai_model', 'deepseek-chat'),
-            'character_configs': character_configs
-        }
-
-        # Save configuration to database
-        config_id = PodcastConfigRepository.save_podcast_config(
-            admin_user['id'],
-            config_data
-        )
-
-        logger.info(f"Podcast configuration saved successfully: ID={config_id}, User={admin_user['username']}")
-
-        return jsonify({
-            'success': True,
-            'message': 'Configuration saved successfully',
-            'config_id': config_id
-        })
-
-    except ValidationError as e:
-        logger.warning(f"Validation error in save_podcast_config: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'error_type': 'validation_error',
-            'field': getattr(e, 'field', None)
-        }), 400
-
-    except Exception as e:
-        logger.error(f"Error saving podcast configuration: {str(e)}")
-        log_exception(e, {
-            'route': 'save_podcast_config',
-            'client_ip': request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
-        })
-        return jsonify({
-            'success': False,
-            'error': 'Failed to save configuration',
-            'error_type': 'server_error'
-        }), 500
-
-
 @app.route('/api/config/models', methods=['GET'])
 @performance_monitoring
 @rate_limit(max_requests=20, window_seconds=60)
@@ -4318,7 +4690,7 @@ if __name__ == '__main__':
                 port=PORT,  # Use port 8080 to avoid conflicts with other services
                 debug=DEBUG,
                 threaded=True,  # Enable threading for concurrent requests
-                use_reloader=DEBUG  # Disable reloader in production
+                use_reloader=False  # Disable reloader to prevent restarts during generation
             )
         except Exception as e:
             logger.critical(f"Failed to start Flask application: {str(e)}")

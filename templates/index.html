@@ -66,7 +66,7 @@
                                 placeholder="详细描述您的播客主题。例如：'人工智能的未来及其对社会的影响，包括伦理、就业和技术进步的讨论。'"
                                 required
                                 maxlength="1000"
-                            ></textarea>
+                            >{% if saved_config %}{{ saved_config.topic }}{% endif %}</textarea>
                             <div class="d-flex justify-content-between align-items-center mt-2">
                                 <div class="form-text mb-0">
                                     <i class="bi bi-lightbulb text-warning me-1"></i>
@@ -83,11 +83,11 @@
                                     <i class="bi bi-people me-2"></i>参与者数量 <span class="text-danger">*</span>
                                 </label>
                                 <select class="form-select" id="participants" name="participants" required>
-                                    <option value="2">2位参与者 (对话)</option>
-                                    <option value="3">3位参与者 (小组讨论)</option>
-                                    <option value="4">4位参与者 (圆桌讨论)</option>
-                                    <option value="5">5位参与者 (大型小组)</option>
-                                    <option value="6">6位参与者 (完整小组)</option>
+                                    <option value="2" {% if saved_config and saved_config.participants == 2 %}selected{% endif %}>2位参与者 (对话)</option>
+                                    <option value="3" {% if saved_config and saved_config.participants == 3 %}selected{% endif %}>3位参与者 (小组讨论)</option>
+                                    <option value="4" {% if saved_config and saved_config.participants == 4 %}selected{% endif %}>4位参与者 (圆桌讨论)</option>
+                                    <option value="5" {% if saved_config and saved_config.participants == 5 %}selected{% endif %}>5位参与者 (大型小组)</option>
+                                    <option value="6" {% if saved_config and saved_config.participants == 6 %}selected{% endif %}>6位参与者 (完整小组)</option>
                                 </select>
                                 <div class="form-text">每位参与者将具有独特的特征和说话风格</div>
                             </div>
@@ -96,10 +96,10 @@
                                     <i class="bi bi-repeat me-2"></i>对话轮数 <span class="text-danger">*</span>
                                 </label>
                                 <select class="form-select" id="rounds" name="rounds" required>
-                                    <option value="3">3轮 (约5-10分钟)</option>
-                                    <option value="5">5轮 (约10-15分钟)</option>
-                                    <option value="8" selected>8轮 (约15-20分钟)</option>
-                                    <option value="12">12轮 (约20-30分钟)</option>
+                                    <option value="3" {% if saved_config and saved_config.rounds == 3 %}selected{% endif %}>3轮 (约5-10分钟)</option>
+                                    <option value="5" {% if saved_config and saved_config.rounds == 5 %}selected{% endif %}>5轮 (约10-15分钟)</option>
+                                    <option value="8" {% if saved_config and saved_config.rounds == 8 %}selected{% elif not saved_config %}selected{% endif %}>8轮 (约15-20分钟)</option>
+                                    <option value="12" {% if saved_config and saved_config.rounds == 12 %}selected{% endif %}>12轮 (约20-30分钟)</option>
                                 </select>
                                 <div class="form-text">更多轮数将创建更长、更详细的对话</div>
                             </div>
@@ -145,6 +145,7 @@
                                                                name="api_keys.deepseek"
                                                                placeholder="sk-..."
                                                                autocomplete="off"
+                                                               value="{% if api_keys and api_keys.deepseek %}{{ api_keys.deepseek }}{% endif %}"
                                                                required>
                                                         <button class="btn btn-outline-secondary toggle-visibility-btn"
                                                                 type="button"
@@ -296,18 +297,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Save Configuration Button -->
-                                <div class="text-center">
-                                    <button type="button" class="btn btn-success" id="save-api-config-btn">
-                                        <span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
-                                        <i class="bi bi-save me-2"></i>保存API配置
-                                    </button>
-                                    <div class="form-text mt-2">
-                                        <i class="bi bi-shield-check me-1"></i>
-                                        您的API密钥将被加密安全存储
-                                    </div>
                                 </div>
-                            </div>
                         </div>
 
                         <!-- Character Configuration -->

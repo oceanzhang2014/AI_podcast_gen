@@ -206,15 +206,15 @@ class EncryptionService:
     @handle_errors("key_masking")
     def generate_key_mask(self, api_key: str) -> str:
         """
-        Generate a masked version of the API key for UI display.
+        Generate a key mask containing only the last 4 characters for storage.
 
-        Only shows the last 4 characters of the key for identification purposes.
+        The mask is used for identification purposes in the database and UI display.
 
         Args:
             api_key: The full API key to mask
 
         Returns:
-            Masked API key (e.g., "sk-********************abcd")
+            Last 4 characters of the API key (e.g., "abcd")
 
         Raises:
             ConfigurationError: If key masking operation fails
@@ -226,12 +226,12 @@ class EncryptionService:
             raise ConfigurationError("API key must be a string")
 
         try:
-            # If key is too short, return it masked completely
+            # If key is too short, return it as is (still within validation)
             if len(api_key) <= 4:
-                return "*" * len(api_key)
+                return api_key
 
-            # Show only last 4 characters
-            return "*" * (len(api_key) - 4) + api_key[-4:]
+            # Return only last 4 characters for identification
+            return api_key[-4:]
 
         except Exception as e:
             raise ConfigurationError(

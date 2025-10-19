@@ -688,7 +688,18 @@ async function handleFormSubmit(event) {
         return;
     }
 
-    console.log("DEBUG: Form validation passed, starting generation...");
+    console.log("DEBUG: Form validation passed, saving configuration...");
+
+    // Save configuration before starting generation
+    try {
+        await saveConfiguration();
+        console.log("DEBUG: Configuration saved successfully");
+    } catch (error) {
+        console.warn("DEBUG: Failed to save configuration:", error);
+        // Continue with generation even if save fails
+    }
+
+    console.log("DEBUG: Starting generation...");
     await startGeneration();
 }
 
@@ -1061,13 +1072,21 @@ function showResults(result) {
         Elements.generationTimestampElement.textContent = timestamp;
     }
 
-    // Set audio URL if available
-    if (result.data?.audio_url) {
-        AppState.audioUrl = result.data.audio_url;
-        AppState.downloadUrl = result.data.download_url || result.data.audio_url;
+    // Set audio URL if available - check both direct and nested structure
+    const audioUrl = result.data?.file_info?.audio_url || result.data?.audio_url;
+    const downloadUrl = result.data?.file_info?.download_url || result.data?.download_url;
+
+    if (audioUrl) {
+        AppState.audioUrl = audioUrl;
+        AppState.downloadUrl = downloadUrl || audioUrl;
 
         // Validate audio file before setting up player
         validateAndSetupAudio(AppState.audioUrl);
+
+        console.log("=== DEBUG: Audio URLs updated ===");
+        console.log("Audio URL:", AppState.audioUrl);
+        console.log("Download URL:", AppState.downloadUrl);
+        console.log("File info:", result.data?.file_info);
     }
 
     showNotification('Podcast generated successfully!', 'success');
@@ -1322,9 +1341,18 @@ function handleRetry() {
  * Handle download action with enhanced functionality
  */
 async function handleDownload() {
-    if (!AppState.downloadUrl) {
+    // Check both AppState and download button href
+    const downloadBtn = document.getElementById('downloadBtn');
+    const downloadUrl = AppState.downloadUrl || (downloadBtn && downloadBtn.href);
+
+    if (!downloadUrl || downloadUrl === '#') {
         showNotification('No audio file available for download', 'error');
         return;
+    }
+
+    // Update AppState if it was not set
+    if (!AppState.downloadUrl) {
+        AppState.downloadUrl = downloadUrl;
     }
 
     try {
@@ -1332,7 +1360,7 @@ async function handleDownload() {
         showNotification('Preparing download...', 'info');
 
         // Validate download URL before initiating download
-        const response = await fetch(AppState.downloadUrl, { method: 'HEAD' });
+        const response = await fetch(downloadUrl, { method: 'HEAD' });
 
         if (!response.ok) {
             throw new Error(`Download file not accessible (HTTP ${response.status})`);
@@ -1345,7 +1373,7 @@ async function handleDownload() {
 
         // Create a temporary link for download
         const link = document.createElement('a');
-        link.href = AppState.downloadUrl;
+        link.href = downloadUrl;
         link.download = generateFilename();
         link.style.display = 'none';
 
@@ -2163,7 +2191,15 @@ function restoreSavedConfiguration(config) {
         // Restore participants and rounds
         if (config.participants && Elements.participantsSelect) {
             Elements.participantsSelect.value = config.participants;
-            updateCharacterConfig(parseInt(config.participants) || 2);
+            setTimeout(() => {
+                updateCharacterConfig(parseInt(config.participants) || 2);
+                // Restore character configs after character cards are created
+                if (config.character_configs && Array.isArray(config.character_configs)) {
+                    setTimeout(() => {
+                        restoreCharacterConfigurations(config.character_configs);
+                    }, 100);
+                }
+            }, 100);
         }
 
         if (config.rounds) {
@@ -2188,9 +2224,17 @@ function restoreSavedConfiguration(config) {
             }
         }
 
-        // Restore character configurations
+        // Restore API keys
+        if (config.api_keys && typeof config.api_keys === 'object') {
+            restoreAPIKeys(config.api_keys);
+        }
+
+        // Restore character configurations (if not already restored above)
         if (config.character_configs && Array.isArray(config.character_configs)) {
-            restoreCharacterConfigurations(config.character_configs);
+            if (!config.participants) {
+                // If no participants value, restore immediately
+                restoreCharacterConfigurations(config.character_configs);
+            }
         }
 
         // Show notification that configuration was restored
@@ -2205,57 +2249,135 @@ function restoreSavedConfiguration(config) {
 }
 
 /**
+ * Restore API keys to the form
+ */
+function restoreAPIKeys(apiKeys) {
+    console.log('=== DEBUG: Restoring API keys ===', apiKeys);
+
+    try {
+        Object.entries(apiKeys).forEach(([provider, apiKey]) => {
+            if (apiKey && apiKey.trim()) {
+                // Look for API key input by provider name
+                const inputSelectors = [
+                    `#${provider}-api-key-home`,
+                    `input[name="api_keys.${provider}"]`,
+                    `input[data-provider="${provider}"]`
+                ];
+
+                let input = null;
+                for (const selector of inputSelectors) {
+                    input = document.querySelector(selector);
+                    if (input) {
+                        break;
+                    }
+                }
+
+                if (input) {
+                    input.value = apiKey;
+                    input.classList.add('is-valid');
+                    console.log(`=== DEBUG: Restored API key for ${provider} ===`);
+                } else {
+                    console.warn(`=== DEBUG: API key input not found for provider ${provider} ===`);
+                }
+            }
+        });
+    } catch (error) {
+        console.error('=== DEBUG: Error restoring API keys ===', error);
+    }
+}
+
+/**
  * Restore character configurations
  */
 function restoreCharacterConfigurations(characterConfigs) {
+    console.log('=== DEBUG: Restoring character configurations ===', characterConfigs);
+
     try {
-        const participants = parseInt(Elements.participantsSelect.value);
+        const participants = parseInt(Elements.participantsSelect.value) || 2;
 
         characterConfigs.forEach((charConfig, index) => {
             if (index < participants) {
-                const charSection = document.getElementById(`character-${index + 1}`);
-                if (charSection) {
-                    // Restore character name
-                    const nameInput = charSection.querySelector('input[name^="character_name"]');
-                    if (nameInput && charConfig.name) {
-                        nameInput.value = charConfig.name;
-                    }
+                const characterNumber = index + 1;
+                console.log(`=== DEBUG: Restoring character ${characterNumber} ===`, charConfig);
 
-                    // Restore character gender
-                    const genderSelect = charSection.querySelector('select[name^="character_gender"]');
-                    if (genderSelect && charConfig.gender) {
-                        genderSelect.value = charConfig.gender;
-                    }
+                // Restore character name
+                const nameInput = document.querySelector(`input[name="character_${characterNumber}_name"]`);
+                if (nameInput && charConfig.name) {
+                    nameInput.value = charConfig.name;
+                    console.log(`=== DEBUG: Restored name for character ${characterNumber}: ${charConfig.name} ===`);
+                }
 
-                    // Restore character background
-                    const bgTextarea = charSection.querySelector('textarea[name^="character_background"]');
-                    if (bgTextarea && charConfig.background) {
-                        bgTextarea.value = charConfig.background;
-                    }
+                // Restore character gender
+                const genderSelect = document.querySelector(`select[name="character_${characterNumber}_gender"]`);
+                if (genderSelect && charConfig.gender) {
+                    genderSelect.value = charConfig.gender;
+                    // Trigger change event to update age and style options
+                    const changeEvent = new Event('change', { bubbles: true });
+                    genderSelect.dispatchEvent(changeEvent);
+                    console.log(`=== DEBUG: Restored gender for character ${characterNumber}: ${charConfig.gender} ===`);
+                }
 
-                    // Restore character personality
-                    const personalityTextarea = charSection.querySelector('textarea[name^="character_personality"]');
-                    if (personalityTextarea && charConfig.personality) {
-                        personalityTextarea.value = charConfig.personality;
+                // Restore character background
+                const bgTextarea = document.querySelector(`textarea[name="character_${characterNumber}_background"]`);
+                if (bgTextarea && charConfig.background) {
+                    bgTextarea.value = charConfig.background;
+                    // Update character count
+                    const counter = bgTextarea.parentElement.querySelector('.character-count');
+                    if (counter) {
+                        counter.textContent = `${charConfig.background.length}/500`;
                     }
+                    console.log(`=== DEBUG: Restored background for character ${characterNumber} ===`);
+                }
 
-                    // Restore character age if available
-                    const ageInput = charSection.querySelector('input[name^="character_age"]');
-                    if (ageInput && charConfig.age) {
-                        ageInput.value = charConfig.age;
+                // Restore character personality
+                const personalitySelect = document.querySelector(`select[name="character_${characterNumber}_personality"]`);
+                if (personalitySelect && charConfig.personality) {
+                    personalitySelect.value = charConfig.personality;
+                    // Update personality hint
+                    if (typeof updatePersonalityHint === 'function') {
+                        updatePersonalityHint(characterNumber, charConfig.personality);
                     }
+                    console.log(`=== DEBUG: Restored personality for character ${characterNumber}: ${charConfig.personality} ===`);
+                }
 
-                    // Restore character style if available
-                    const styleInput = charSection.querySelector('input[name^="character_style"]');
-                    if (styleInput && charConfig.style) {
-                        styleInput.value = charConfig.style;
-                    }
+                // Restore character age if available (with delay to wait for gender change)
+                if (charConfig.age) {
+                    setTimeout(() => {
+                        const ageSelect = document.querySelector(`select[name="character_${characterNumber}_age"]`);
+                        if (ageSelect) {
+                            ageSelect.value = charConfig.age;
+                            // Trigger change event to update style options
+                            const changeEvent = new Event('change', { bubbles: true });
+                            ageSelect.dispatchEvent(changeEvent);
+                            console.log(`=== DEBUG: Restored age for character ${characterNumber}: ${charConfig.age} ===`);
+                        }
+                    }, 200);
+                }
+
+                // Restore character style if available (with longer delay to wait for age change)
+                if (charConfig.style) {
+                    setTimeout(() => {
+                        const styleSelect = document.querySelector(`select[name="character_${characterNumber}_style"]`);
+                        if (styleSelect) {
+                            styleSelect.value = charConfig.style;
+                            console.log(`=== DEBUG: Restored style for character ${characterNumber}: ${charConfig.style} ===`);
+                        }
+                    }, 400);
+                }
+
+                // Restore character model if available
+                const modelSelect = document.querySelector(`select[name="character_${characterNumber}_model"]`);
+                if (modelSelect && charConfig.model) {
+                    modelSelect.value = charConfig.model;
+                    console.log(`=== DEBUG: Restored model for character ${characterNumber}: ${charConfig.model} ===`);
                 }
             }
         });
 
+        console.log('=== DEBUG: Character configurations restored successfully ===');
+
     } catch (error) {
-        console.error('Error restoring character configurations:', error);
+        console.error('=== DEBUG: Error restoring character configurations ===', error);
     }
 }
 
@@ -2308,38 +2430,16 @@ function debounceAutoSave() {
  * Save current form configuration
  */
 async function saveConfiguration() {
-    if (!AppState.hasUnsavedChanges) {
-        return; // No changes to save
-    }
-
     try {
-        // Get current form data
-        const formData = new FormData(Elements.form);
-        const configData = {
-            topic: formData.get('topic') || '',
-            participants: parseInt(formData.get('participants')) || 2,
-            rounds: parseInt(formData.get('rounds')) || 8,
-            ai_provider: formData.get('ai_provider') || 'deepseek',
-            ai_model: formData.get('ai_model') || 'deepseek-chat',
-            character_configs: []
-        };
+        console.log('=== DEBUG: Saving configuration ===');
 
-        // Get character configurations
-        const participants = configData.participants;
-        for (let i = 1; i <= participants; i++) {
-            const charConfig = {
-                name: formData.get(`character_name_${i}`) || '',
-                gender: formData.get(`character_gender_${i}`) || 'male',
-                background: formData.get(`character_background_${i}`) || '',
-                personality: formData.get(`character_personality_${i}`) || '',
-                age: formData.get(`character_age_${i}`) || '',
-                style: formData.get(`character_style_${i}`) || ''
-            };
-            configData.character_configs.push(charConfig);
-        }
+        // Collect all form data
+        const configData = collectAllFormData();
+
+        console.log('=== DEBUG: Collected configuration data ===', configData);
 
         // Send to server for saving
-        const response = await fetch('/save-config', {
+        const response = await fetch('/api/podcast-config/save', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2348,17 +2448,68 @@ async function saveConfiguration() {
         });
 
         if (response.ok) {
+            const result = await response.json();
             AppState.hasUnsavedChanges = false;
-            console.log('=== DEBUG: Configuration saved successfully ===');
-            // Don't show notification for auto-save to avoid spam
+            console.log('=== DEBUG: Configuration saved successfully ===', result);
+            return result;
         } else {
-            console.warn('=== DEBUG: Failed to save configuration ===');
+            const errorText = await response.text();
+            console.warn('=== DEBUG: Failed to save configuration ===', errorText);
+            throw new Error(`Save failed: ${response.status} ${errorText}`);
         }
 
     } catch (error) {
         console.error('=== DEBUG: Error saving configuration ===', error);
-        // Don't show error notification for auto-save to avoid spam
+        throw error;
     }
+}
+
+/**
+ * Collect all form data including API keys and character configurations
+ */
+function collectAllFormData() {
+    console.log('=== DEBUG: Collecting all form data ===');
+
+    // Basic form data
+    const formData = new FormData(Elements.form);
+    const flatData = Object.fromEntries(formData.entries());
+
+    const configData = {
+        topic: formData.get('topic') || '',
+        participants: parseInt(formData.get('participants')) || 2,
+        rounds: parseInt(formData.get('rounds')) || 8,
+        ai_provider: formData.get('ai_provider') || 'deepseek',
+        ai_model: formData.get('ai_model') || 'deepseek-chat',
+        character_configs: []
+    };
+
+    // Collect API keys
+    configData.api_keys = {};
+    const apiKeyInputs = document.querySelectorAll('.api-key-input');
+    apiKeyInputs.forEach(input => {
+        if (input.value.trim()) {
+            const provider = input.name.replace('api_keys.', '');
+            configData.api_keys[provider] = input.value.trim();
+        }
+    });
+
+    // Get character configurations
+    const participants = configData.participants;
+    for (let i = 1; i <= participants; i++) {
+        const charConfig = {
+            name: formData.get(`character_${i}_name`) || '',
+            gender: formData.get(`character_${i}_gender`) || '',
+            age: formData.get(`character_${i}_age`) || '',
+            style: formData.get(`character_${i}_style`) || '',
+            background: formData.get(`character_${i}_background`) || '',
+            personality: formData.get(`character_${i}_personality`) || '',
+            model: formData.get(`character_${i}_model`) || ''
+        };
+        configData.character_configs.push(charConfig);
+    }
+
+    console.log('=== DEBUG: Final configuration data ===', configData);
+    return configData;
 }
 
 // Enhanced export for global access
@@ -2386,7 +2537,10 @@ window.PodcastApp = {
     loadAPIConfiguration,
     initializeFormDataPersistence,
     restoreSavedConfiguration,
+    restoreAPIKeys,
+    restoreCharacterConfigurations,
     setupAutoSave,
     saveConfiguration,
+    collectAllFormData,
     debounceAutoSave
 };
