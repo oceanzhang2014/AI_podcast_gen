@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from dataclasses import asdict
 
-from utils.encryption_service import get_encryption_service
+# Encryption service removed - API keys now stored in plain text
 from utils.config_repository import get_config_repository
 from utils.error_handler import (
     ConfigurationError, ValidationError, DatabaseError, NetworkError,
@@ -58,7 +58,7 @@ class ConfigurationService:
 
         try:
             # Initialize dependencies with fallback to global instances
-            self.encryption_service = encryption_service or get_encryption_service()
+            # Encryption service removed - API keys stored in plain text
             self.repository = repository or get_config_repository()
 
             # Rate limiting storage (in production, use Redis or similar)
@@ -131,8 +131,8 @@ class ConfigurationService:
             if not user_config:
                 user_config = self.repository.create_user_config(session_id)
 
-            # Validate and encrypt API keys
-            encrypted_api_keys = []
+            # Validate and store API keys in plain text
+            api_key_configs = []
             validation_details = []
 
             for provider, api_key in api_keys.items():
@@ -147,20 +147,20 @@ class ConfigurationService:
                     # Validate API key format
                     validate_api_key_format(validated_provider, api_key.strip())
 
-                    # Encrypt the API key
-                    encrypted_key = self.encryption_service.encrypt(api_key.strip())
-                    key_mask = self.encryption_service.generate_key_mask(api_key.strip())
+                    # Store API key in plain text (no encryption)
+                    plain_key = api_key.strip()
+                    key_mask = plain_key[-4:] if len(plain_key) > 4 else plain_key  # Last 4 chars for identification
 
                     # Create API key configuration
                     api_key_config = create_api_key_config(
                         provider=validated_provider,
-                        encrypted_key=encrypted_key,
+                        encrypted_key=plain_key,  # Store as plain text
                         key_mask=key_mask,
                         is_valid=True
                     )
 
-                    encrypted_api_keys.append(api_key_config)
-                    validation_details.append(f"Validated and encrypted {validated_provider} API key")
+                    api_key_configs.append(api_key_config)
+                    validation_details.append(f"Validated and saved {validated_provider} API key")
 
                     self.logger.debug(f"Successfully processed API key for provider: {validated_provider}")
 
@@ -170,14 +170,14 @@ class ConfigurationService:
                     validation_details.append(f"Failed to validate {provider} API key: {str(e)}")
                     continue
 
-            if not encrypted_api_keys:
+            if not api_key_configs:
                 raise ValidationError("No valid API keys were provided", field="api_keys")
 
             # Update user configuration with new API keys
             # Keep existing agent configurations
             updated_config = UserConfig(
                 session_id=user_config.session_id,
-                api_keys=encrypted_api_keys,
+                api_keys=api_key_configs,
                 agent_configs=user_config.agent_configs,
                 created_at=user_config.created_at,
                 updated_at=datetime.now()
@@ -195,10 +195,10 @@ class ConfigurationService:
                 self.repository.log_configuration_change(
                     session_id=session_id,
                     action="save_api_keys",
-                    details=f"Saved {len(encrypted_api_keys)} API keys. {details}"
+                    details=f"Saved {len(api_key_configs)} API keys. {details}"
                 )
 
-                self.logger.info(f"Successfully saved {len(encrypted_api_keys)} API keys for session: {session_id}")
+                self.logger.info(f"Successfully saved {len(api_key_configs)} API keys for session: {session_id}")
                 return True
             else:
                 raise ConfigurationError("Failed to save API keys to database")
@@ -266,9 +266,9 @@ class ConfigurationService:
                 self._api_keys_cache.set(cache_key, {})
                 return {}
 
-            # Decrypt API keys
-            decrypted_keys = {}
-            decryption_failures = []
+            # Get API keys (stored as plain text)
+            api_keys = {}
+            load_failures = []
 
             for api_key_config in user_config.api_keys:
                 if not api_key_config.is_valid:
@@ -276,32 +276,31 @@ class ConfigurationService:
                     continue
 
                 try:
-                    # Decrypt the API key
-                    decrypted_key = self.encryption_service.decrypt(api_key_config.encrypted_key)
-                    decrypted_keys[api_key_config.provider] = decrypted_key
+                    # API key is stored as plain text, no decryption needed
+                    api_keys[api_key_config.provider] = api_key_config.encrypted_key
 
-                    self.logger.debug(f"Successfully decrypted API key for provider: {api_key_config.provider}")
+                    self.logger.debug(f"Successfully loaded API key for provider: {api_key_config.provider}")
 
                 except Exception as e:
-                    self.logger.error(f"Failed to decrypt API key for provider {api_key_config.provider}: {str(e)}")
-                    decryption_failures.append(f"{api_key_config.provider}: {str(e)}")
+                    self.logger.error(f"Failed to load API key for provider {api_key_config.provider}: {str(e)}")
+                    load_failures.append(f"{api_key_config.provider}: {str(e)}")
                     continue
 
-            if decryption_failures:
-                self.logger.warning(f"Some API keys failed to decrypt for session {session_id}: {'; '.join(decryption_failures)}")
+            if load_failures:
+                self.logger.warning(f"Some API keys failed to load for session {session_id}: {'; '.join(load_failures)}")
 
             # Cache the result (even if empty to prevent repeated queries)
-            self._api_keys_cache.set(cache_key, decrypted_keys)
+            self._api_keys_cache.set(cache_key, api_keys)
 
             # Log successful retrieval
             self.repository.log_configuration_change(
                 session_id=session_id,
                 action="get_api_keys",
-                details=f"Retrieved {len(decrypted_keys)} API keys"
+                details=f"Retrieved {len(api_keys)} API keys"
             )
 
-            self.logger.info(f"Successfully retrieved {len(decrypted_keys)} API keys for session: {session_id}")
-            return decrypted_keys
+            self.logger.info(f"Successfully retrieved {len(api_keys)} API keys for session: {session_id}")
+            return api_keys
 
         except Exception as e:
             if isinstance(e, (ValidationError, ConfigurationError, DatabaseError)):
@@ -921,7 +920,7 @@ class ConfigurationService:
         """
         try:
             return {
-                'encryption_service': bool(self.encryption_service),
+                'encryption_service': False,  # Disabled - using plain text storage
                 'repository': bool(self.repository),
                 'rate_limit_entries': len(self._rate_limit_store),
                 'cache_stats': {

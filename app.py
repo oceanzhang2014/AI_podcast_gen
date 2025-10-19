@@ -3433,7 +3433,6 @@ def get_all_voice_combinations():
 
 @app.route('/api/config', methods=['GET', 'POST', 'DELETE'])
 @performance_monitoring
-@rate_limit(max_requests=5, window_seconds=60)
 def configuration():
     """
     Configuration management endpoint for API keys and agent settings.
@@ -3452,14 +3451,13 @@ def configuration():
     try:
         # Import configuration service and related components
         from utils.configuration_service import ConfigurationService
-        from utils.encryption_service import EncryptionService
         from utils.config_repository import ConfigRepository
-        from utils.error_handler import ConfigurationError, EncryptionError
+        from utils.error_handler import ConfigurationError
 
         # Initialize components
-        encryption_service = EncryptionService()
+        # Encryption service removed - API keys stored in plain text
         repository = ConfigRepository()
-        config_service = ConfigurationService(encryption_service, repository)
+        config_service = ConfigurationService(repository=repository)
 
         # Get or create session ID
         session_id = session.get('session_id')
@@ -3476,19 +3474,21 @@ def configuration():
             logger.info(f"Loading configuration for session {session_id} from {client_ip}")
 
             try:
-                # Get API keys (masked for security)
+                # Get API keys (try current session first, then admin_admin as fallback)
                 api_keys = config_service.get_api_keys(session_id)
+
+                # If no API keys found in current session, try admin_admin session
+                if not api_keys:
+                    admin_api_keys = config_service.get_api_keys("admin_admin")
+                    if admin_api_keys:
+                        api_keys = admin_api_keys
+                        logger.info(f"Using API keys from admin_admin session for session {session_id}")
 
                 # Get agent configurations
                 agent_configs = config_service.get_agent_config(session_id)
 
-                # Mask API keys for frontend display (show only last 4 chars)
-                masked_api_keys = {}
-                for provider, key in api_keys.items():
-                    if key and len(key) > 4:
-                        masked_api_keys[provider] = '*' * (len(key) - 4) + key[-4:]
-                    else:
-                        masked_api_keys[provider] = key
+                # API keys are now returned as plain text (no masking)
+                masked_api_keys = api_keys
 
                 response_data = {
                     'success': True,
@@ -3524,55 +3524,16 @@ def configuration():
                     if not isinstance(api_keys, dict):
                         raise ValidationError("API keys must be a dictionary", field='api_keys')
 
-                    # Save API keys directly to admin_admin session in plaintext
-                    admin_session_id = "admin_admin"
-                    logger.info(f"Saving API keys to admin session: {admin_session_id}")
+                    # Save API keys using the configuration service
+                    logger.info(f"Saving {len(api_keys)} API keys for session {session_id}")
 
                     try:
-                        # Use direct database insertion for plaintext storage
-                        from utils.database import get_database_manager
-                        with get_database_manager().get_connection() as conn:
-                            # Get admin user ID
-                            cursor = conn.execute(
-                                "SELECT id FROM users WHERE session_id = ?",
-                                (admin_session_id,)
-                            )
-                            admin_user = cursor.fetchone()
+                        # Use the configuration service to save API keys
+                        success = config_service.save_api_keys(session_id, api_keys)
+                        if not success:
+                            raise ConfigurationError("Failed to save API keys using configuration service")
 
-                            if not admin_user:
-                                # Create admin user if not exists
-                                cursor = conn.execute(
-                                    "INSERT INTO users (session_id) VALUES (?)",
-                                    (admin_session_id,)
-                                )
-                                admin_user_id = cursor.lastrowid
-                            else:
-                                admin_user_id = admin_user['id']
-
-                            # Delete existing API keys for admin
-                            conn.execute(
-                                "DELETE FROM api_keys WHERE user_id = ?",
-                                (admin_user_id,)
-                            )
-
-                            # Insert new API keys in plaintext
-                            for provider, api_key in api_keys.items():
-                                if api_key and api_key.strip():
-                                    # Store API key as plaintext in encrypted_key field
-                                    # Store last 4 chars as mask for display
-                                    key_mask = api_key.strip()[-4:] if len(api_key.strip()) > 4 else api_key.strip()
-
-                                    conn.execute(
-                                        """
-                                        INSERT INTO api_keys
-                                        (user_id, provider, encrypted_key, key_mask, is_valid)
-                                        VALUES (?, ?, ?, ?, ?)
-                                        """,
-                                        (admin_user_id, provider, api_key.strip(), key_mask, True)
-                                    )
-
-                            conn.commit()
-                            logger.info(f"Successfully saved {len(api_keys)} API keys to admin session")
+                        logger.info(f"Successfully saved {len(api_keys)} API keys for session {session_id}")
 
                     except Exception as e:
                         logger.error(f"Failed to save API keys to database: {str(e)}")
@@ -3725,14 +3686,13 @@ def validate_api_key():
     try:
         # Import configuration service and related components
         from utils.configuration_service import ConfigurationService
-        from utils.encryption_service import EncryptionService
         from utils.config_repository import ConfigRepository
         from utils.error_handler import ConfigurationError
 
         # Initialize components
-        encryption_service = EncryptionService()
+        # Encryption service removed - API keys stored in plain text
         repository = ConfigRepository()
-        config_service = ConfigurationService(encryption_service, repository)
+        config_service = ConfigurationService(repository=repository)
 
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
         logger.info(f"API key validation request from {client_ip}")
@@ -3850,19 +3810,18 @@ def export_configuration():
     Raises:
         ValidationError: If session validation fails
         ConfigurationError: If export operations fail
-        EncryptionError: If encryption operations fail
+        ValidationError: If configuration parsing fails
     """
     try:
         # Import configuration service and related components
         from utils.configuration_service import ConfigurationService
-        from utils.encryption_service import EncryptionService
         from utils.config_repository import ConfigRepository
-        from utils.error_handler import ConfigurationError, EncryptionError
+        from utils.error_handler import ConfigurationError
 
         # Initialize components
-        encryption_service = EncryptionService()
+        # Encryption service removed - API keys stored in plain text
         repository = ConfigRepository()
-        config_service = ConfigurationService(encryption_service, repository)
+        config_service = ConfigurationService(repository=repository)
 
         # Get session ID
         session_id = session.get('session_id')
@@ -3891,20 +3850,14 @@ def export_configuration():
                 }
             }
 
-            # Generate a unique export key for this export
-            import secrets
-            export_key = secrets.token_urlsafe(32)
-
-            # Encrypt the entire export data with the export key
+            # No encryption - export data as plain text
             import json
             json_data = json.dumps(export_data, indent=2)
-            encrypted_data = encryption_service.encrypt(json_data, export_key)
 
             response_data = {
                 'success': True,
                 'data': {
-                    'encrypted_config': encrypted_data,
-                    'export_key': export_key,
+                    'config': json_data,  # Plain text JSON
                     'version': export_data['version'],
                     'exported_at': export_data['exported_at'],
                     'metadata': export_data['metadata']
@@ -3982,19 +3935,17 @@ def import_configuration():
     Raises:
         ValidationError: If import data validation fails
         ConfigurationError: If import operations fail
-        EncryptionError: If decryption operations fail
     """
     try:
         # Import configuration service and related components
         from utils.configuration_service import ConfigurationService
-        from utils.encryption_service import EncryptionService
         from utils.config_repository import ConfigRepository
-        from utils.error_handler import ConfigurationError, EncryptionError, ValidationError
+        from utils.error_handler import ConfigurationError, ValidationError
 
         # Initialize components
-        encryption_service = EncryptionService()
+        # Encryption service removed - API keys stored in plain text
         repository = ConfigRepository()
-        config_service = ConfigurationService(encryption_service, repository)
+        config_service = ConfigurationService(repository=repository)
 
         # Get session ID
         session_id = session.get('session_id')
@@ -4010,29 +3961,26 @@ def import_configuration():
             raise ValidationError("Request data cannot be empty", field='request_data')
 
         # Validate required fields
-        required_fields = ['encrypted_config', 'export_key']
+        required_fields = ['config']  # Only need config now
         for field in required_fields:
             if field not in request_data:
                 raise ValidationError(f"Missing required field: {field}", field=field)
 
-        encrypted_config = request_data['encrypted_config']
-        export_key = request_data['export_key']
+        config = request_data.get('config')  # Changed from encrypted_config to config
 
-        if not encrypted_config or not export_key:
-            raise ValidationError("Encrypted config and export key cannot be empty", field='data')
+        if not config:
+            raise ValidationError("Configuration data cannot be empty", field='data')
 
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
         logger.info(f"Configuration import request for session {session_id} from {client_ip}")
 
         try:
-            # Decrypt the configuration data
+            # Configuration data is now plain text JSON
             import json
-            decrypted_json = encryption_service.decrypt(encrypted_config, export_key)
-
             try:
-                import_data = json.loads(decrypted_json)
+                import_data = json.loads(config)
             except json.JSONDecodeError as e:
-                raise EncryptionError("Failed to parse decrypted configuration data", original_error=e)
+                raise ValidationError("Failed to parse configuration data", original_error=e)
 
             # Validate import data structure
             if not isinstance(import_data, dict):
@@ -4061,7 +4009,8 @@ def import_configuration():
                 raise ValidationError("Agent configurations must be a list", field='agent_configs')
 
             # Import API keys
-            imported_api_keys = 0
+            # Validate all API keys first
+            valid_api_keys = {}
             for provider, api_key in api_keys.items():
                 if not api_key or not isinstance(api_key, str):
                     logger.warning(f"Skipping invalid API key for provider: {provider}")
@@ -4072,12 +4021,19 @@ def import_configuration():
                     logger.warning(f"Skipping API key with invalid format for provider: {provider}")
                     continue
 
-                success = config_service.save_api_key(session_id, provider, api_key)
+                valid_api_keys[provider] = api_key
+
+            # Save all valid API keys at once
+            if valid_api_keys:
+                success = config_service.save_api_keys(session_id, valid_api_keys)
                 if success:
-                    imported_api_keys += 1
-                    logger.info(f"Successfully imported API key for provider: {provider}")
+                    imported_api_keys = len(valid_api_keys)
+                    logger.info(f"Successfully imported {imported_api_keys} API keys")
                 else:
-                    logger.warning(f"Failed to import API key for provider: {provider}")
+                    logger.warning("Failed to import API keys")
+            else:
+                imported_api_keys = 0
+                logger.warning("No valid API keys to import")
 
             # Import agent configurations
             imported_agent_configs = 0
@@ -4205,14 +4161,13 @@ def get_available_models():
     try:
         # Import configuration service and related components
         from utils.configuration_service import ConfigurationService
-        from utils.encryption_service import EncryptionService
         from utils.config_repository import ConfigRepository
         from utils.error_handler import ConfigurationError
 
         # Initialize components
-        encryption_service = EncryptionService()
+        # Encryption service removed - API keys stored in plain text
         repository = ConfigRepository()
-        config_service = ConfigurationService(encryption_service, repository)
+        config_service = ConfigurationService(repository=repository)
 
         client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
         logger.info(f"Available models request from {client_ip}")

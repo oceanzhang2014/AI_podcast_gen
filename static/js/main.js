@@ -2002,6 +2002,9 @@ async function handleAPIKeyValidation(event) {
             input.classList.remove('is-invalid');
             input.classList.add('is-valid');
             showNotification(`${provider} API密钥验证成功`, 'success');
+
+            // 验证成功后自动保存API密钥
+            await saveAPIKeyAfterValidation(provider, input.value.trim());
         } else {
             updateValidationStatus(validationDiv, 'error', '验证失败');
             input.classList.remove('is-valid');
@@ -2016,6 +2019,46 @@ async function handleAPIKeyValidation(event) {
         // Restore button state
         button.disabled = false;
         button.innerHTML = '<i class="bi bi-check-circle me-1"></i>验证';
+    }
+}
+
+/**
+ * Save API key after successful validation
+ */
+async function saveAPIKeyAfterValidation(provider, apiKey) {
+    try {
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                api_keys: {
+                    [provider]: apiKey
+                }
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            console.log(`${provider} API密钥已自动保存`);
+            // 可选：显示一个更低调的保存成功提示
+            const savedIndicator = document.getElementById(`${provider}-saved-indicator`);
+            if (savedIndicator) {
+                savedIndicator.style.display = 'inline';
+                savedIndicator.innerHTML = '<i class="bi bi-check-circle text-success"></i> 已保存';
+                setTimeout(() => {
+                    savedIndicator.style.display = 'none';
+                }, 3000);
+            }
+        } else {
+            console.error(`保存${provider} API密钥失败:`, result.error);
+            showNotification(`API密钥验证成功但保存失败: ${result.error}`, 'warning');
+        }
+    } catch (error) {
+        console.error('Save API key error:', error);
+        showNotification('API密钥验证成功但保存时发生网络错误', 'warning');
     }
 }
 
