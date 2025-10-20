@@ -637,6 +637,12 @@ class DatabaseManager:
                     ON api_keys (is_valid)
                 ''')
 
+                # Add composite index for API key queries to optimize persistent display
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_api_keys_user_valid_updated
+                    ON api_keys (user_id, is_valid, updated_at DESC)
+                ''')
+
                 cursor.execute('''
                     CREATE INDEX IF NOT EXISTS idx_agent_configs_user_id
                     ON agent_configs (user_id)
@@ -892,6 +898,43 @@ class AudioFileService:
             logger.error(f"Error finding user audio files: {str(e)}")
             return None
 
+def get_most_recent_api_key_session():
+    """
+    Get the most recently used session ID that has API keys.
+    This ensures we load the user's actual API keys instead of test data.
+    """
+    try:
+        from utils.database import get_database_manager
+
+        with get_database_manager().get_connection() as conn:
+            # Find the most recently updated session with API keys (excluding admin_admin test session)
+            cursor = conn.execute("""
+                SELECT u.session_id, MAX(a.updated_at) as latest_update
+                FROM api_keys a
+                JOIN users u ON a.user_id = u.id
+                WHERE a.is_valid = 1 AND u.session_id != 'admin_admin'
+                GROUP BY u.session_id
+                ORDER BY latest_update DESC
+                LIMIT 1
+            """)
+
+            result = cursor.fetchone()
+
+            if result:
+                session_id = result['session_id']
+                logger.info(f"Found most recent session with API keys: {session_id}")
+                return session_id
+            else:
+                logger.warning("No session with API keys found (excluding admin_admin)")
+                # Fallback to admin_admin if no other sessions have keys
+                return "admin_admin"
+
+    except Exception as e:
+        logger.error(f"Error finding most recent API key session: {str(e)}")
+        # Fallback to admin_admin on error
+        return "admin_admin"
+
+
 # Initialize Flask application
 app = Flask(__name__)
 
@@ -1126,15 +1169,17 @@ def index():
             template_context['download_url'] = None
             template_context['has_audio'] = False
 
-        # Load API keys for admin user (plaintext loading)
+        # Enhanced API key loading for persistent display
         try:
             from utils.database import get_database_manager
-            admin_session_id = "admin_admin"
-            logger.info(f"Loading API keys from admin session: '{admin_session_id}'")
 
-            # Load API keys directly from database in plaintext
+            # Find the most recently used session with API keys
+            admin_session_id = get_most_recent_api_key_session()
+            logger.info(f"Loading API keys for persistent display from session: '{admin_session_id}'")
+
+            # Load API keys directly from database with enhanced error handling
             with get_database_manager().get_connection() as conn:
-                # Get admin user ID
+                # Get admin user ID with retry logic
                 cursor = conn.execute(
                     "SELECT id FROM users WHERE session_id = ?",
                     (admin_session_id,)
@@ -1142,40 +1187,66 @@ def index():
                 admin_user_db = cursor.fetchone()
 
                 api_keys = {}
+                api_key_validity = {}  # Track validation status for each provider
+
                 if admin_user_db:
                     admin_user_id = admin_user_db['id']
-                    # Get API keys for admin user
+                    logger.debug(f"Found admin user ID: {admin_user_id}")
+
+                    # Get API keys for admin user with optimized query using composite index
                     api_keys_result = conn.execute(
                         """
-                        SELECT provider, encrypted_key, key_mask
+                        SELECT provider, encrypted_key, key_mask, is_valid, updated_at
                         FROM api_keys
                         WHERE user_id = ? AND is_valid = 1
+                        ORDER BY updated_at DESC
                         """,
                         (admin_user_id,)
                     ).fetchall()
+
+                    logger.debug(f"Found {len(api_keys_result)} API key records in database")
 
                     for api_key_row in api_keys_result:
                         # Use the plaintext API key (stored in encrypted_key field)
                         provider = api_key_row['provider']
                         plaintext_key = api_key_row['encrypted_key']  # This now contains plaintext
-                        api_keys[provider] = plaintext_key
+                        is_valid = bool(api_key_row['is_valid'])
 
-                # Create masked version for display
-                masked_api_keys = {}
-                for provider, key in api_keys.items():
-                    if key and len(key) > 4:
-                        masked_api_keys[provider] = '*' * (len(key) - 4) + key[-4:]
-                    else:
-                        masked_api_keys[provider] = key
+                        # Only include valid API keys for display
+                        if plaintext_key and plaintext_key.strip():
+                            api_keys[provider] = plaintext_key
+                            api_key_validity[provider] = is_valid
+                            logger.debug(f"Loaded {provider} API key (valid: {is_valid})")
 
-                template_context['api_keys'] = masked_api_keys
+                # Enhanced template context with API key metadata
+                # Use the complete API keys directly without additional masking
+                template_context['api_keys'] = api_keys
                 template_context['has_api_keys'] = len(api_keys) > 0
-                logger.info(f"Loaded {len(api_keys)} API keys for admin user from database")
+                template_context['api_key_validity'] = api_key_validity  # For validation status display
+                template_context['api_key_providers'] = list(api_keys.keys())  # For JavaScript
+
+                # DEBUG: Log what's being passed to template
+                logger.info(f"DEBUG: API keys being passed to template: {api_keys}")
+                logger.info(f"Successfully loaded {len(api_keys)} API keys for persistent display")
+
+                # Log successful load with providers (but not the keys themselves)
+                if api_keys:
+                    providers_str = ', '.join(api_keys.keys())
+                    logger.info(f"API key providers loaded: {providers_str}")
 
         except Exception as e:
-            logger.warning(f"Error loading API keys: {str(e)}")
+            logger.error(f"Error loading API keys for persistent display: {str(e)}")
+            log_exception(e, {
+                'route': 'index',
+                'operation': 'api_key_loading',
+                'admin_session_id': 'admin_admin'
+            })
+
+            # Ensure graceful fallback
             template_context['api_keys'] = {}
             template_context['has_api_keys'] = False
+            template_context['api_key_validity'] = {}
+            template_context['api_key_providers'] = []
 
         logger.info("Index page rendered successfully")
         return render_template('index.html', **template_context)

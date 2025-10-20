@@ -68,6 +68,8 @@ function initializeApp() {
     setupEventListeners();
     initializeForm();
     initializeAPIConfiguration();
+    // Initialize persistent API keys from backend
+    initializePersistentAPIKeys();
     initializeFormDataPersistence();
     console.log('Podcast Generation App initialized');
     console.log("=== DEBUG: App initialization completed ===");
@@ -1946,6 +1948,7 @@ function initializeAPIConfiguration() {
 
 /**
  * Handle API key visibility toggle
+ * Enhanced for persistent API key compatibility
  */
 function handleToggleVisibility(event) {
     const button = event.currentTarget;
@@ -1953,15 +1956,34 @@ function handleToggleVisibility(event) {
     const input = document.getElementById(inputId);
     const icon = button.querySelector('.toggle-icon');
 
+    if (!input || !icon) {
+        console.warn('Toggle visibility: Input or icon not found', { inputId, button });
+        return;
+    }
+
     if (input.type === 'password') {
         input.type = 'text';
         icon.className = 'bi bi-eye-slash toggle-icon';
         button.title = '隐藏密码';
+
+        // Add visual feedback for persistent keys
+        if (input.classList.contains('persisted-key')) {
+            input.classList.add('persisted-key-visible');
+        }
     } else {
         input.type = 'password';
         icon.className = 'bi bi-eye toggle-icon';
         button.title = '显示/隐藏';
+
+        // Remove visual feedback for persistent keys
+        input.classList.remove('persisted-key-visible');
     }
+
+    // Add subtle animation
+    button.classList.add('toggle-active');
+    setTimeout(() => {
+        button.classList.remove('toggle-active');
+    }, 150);
 }
 
 /**
@@ -2555,6 +2577,135 @@ function collectAllFormData() {
     return configData;
 }
 
+/**
+ * Initialize API keys for persistent display
+ * Enhanced with performance optimizations and error handling
+ * This function handles the initialization of API keys that are loaded from the backend
+ * and displayed in a masked format for persistent storage.
+ */
+function initializePersistentAPIKeys() {
+    try {
+        console.log('=== DEBUG: Initializing persistent API keys ===');
+
+        // Early return if no API keys are available
+        if (!window.HAS_API_KEYS || !window.API_KEYS || !window.API_KEY_PROVIDERS) {
+            console.log('=== DEBUG: No persistent API keys found ===');
+            return;
+        }
+
+        console.log('=== DEBUG: Found API keys from backend ===', {
+            hasKeys: window.HAS_API_KEYS,
+            providers: window.API_KEY_PROVIDERS,
+            validity: window.API_KEY_VALIDITY
+        });
+
+        // Use requestAnimationFrame for smooth initialization
+        requestAnimationFrame(() => {
+            const startTime = performance.now();
+            let processedKeys = 0;
+
+            // Process each API key provider with error handling
+            window.API_KEY_PROVIDERS.forEach(provider => {
+                try {
+                    const input = document.getElementById(`${provider}-api-key-home`);
+                    const maskedKey = window.API_KEYS[provider];
+                    const isValid = window.API_KEY_VALIDITY[provider];
+
+                    if (input && maskedKey) {
+                        // Set the masked value
+                        input.value = maskedKey;
+
+                        // Add visual indication that this is a persisted key
+                        input.classList.add('persisted-key');
+
+                        // Update validation status based on backend data
+                        updateValidationStatusFromBackend(provider, isValid);
+
+                        processedKeys++;
+                        console.log(`=== DEBUG: Initialized ${provider} API key (masked: ${maskedKey.substring(0, 6)}..., valid: ${isValid})`);
+                    } else {
+                        console.warn(`=== DEBUG: Could not find input for provider ${provider} ===`);
+                    }
+                } catch (error) {
+                    console.error(`=== DEBUG: Error processing ${provider} API key ===`, error);
+                }
+            });
+
+            // Performance logging
+            const endTime = performance.now();
+            console.log(`=== DEBUG: Processed ${processedKeys} API keys in ${(endTime - startTime).toFixed(2)}ms ===`);
+
+            // Show a subtle notification about loaded keys (deferred for better UX)
+            if (processedKeys > 0) {
+                setTimeout(() => {
+                    showNotification(`已加载 ${processedKeys} 个已保存的API密钥`, 'info');
+                }, 500); // Small delay to not interfere with page load
+            }
+        });
+
+    } catch (error) {
+        console.error('=== DEBUG: Error initializing persistent API keys ===', error);
+        // Fallback: try basic initialization without performance optimizations
+        try {
+            initializePersistentAPIKeysFallback();
+        } catch (fallbackError) {
+            console.error('=== DEBUG: Fallback initialization also failed ===', fallbackError);
+        }
+    }
+}
+
+/**
+ * Fallback initialization for persistent API keys
+ * Simplified version without performance optimizations
+ */
+function initializePersistentAPIKeysFallback() {
+    console.log('=== DEBUG: Using fallback API key initialization ===');
+
+    if (window.API_KEY_PROVIDERS) {
+        window.API_KEY_PROVIDERS.forEach(provider => {
+            const input = document.getElementById(`${provider}-api-key-home`);
+            const maskedKey = window.API_KEYS[provider];
+
+            if (input && maskedKey) {
+                input.value = maskedKey;
+                input.classList.add('persisted-key');
+                updateValidationStatusFromBackend(provider, window.API_KEY_VALIDITY[provider]);
+            }
+        });
+    }
+}
+
+/**
+ * Update validation status based on backend data
+ */
+function updateValidationStatusFromBackend(provider, isValid) {
+    const validationDiv = document.getElementById(`${provider}-validation-home`);
+    if (!validationDiv) return;
+
+    // Remove existing status classes
+    validationDiv.innerHTML = '';
+
+    if (isValid) {
+        validationDiv.innerHTML = `
+            <span class="badge bg-success">
+                <i class="bi bi-check-circle me-1"></i>已验证
+            </span>
+        `;
+    } else if (isValid === false) {
+        validationDiv.innerHTML = `
+            <span class="badge bg-warning">
+                <i class="bi bi-exclamation-triangle me-1"></i>待验证
+            </span>
+        `;
+    } else {
+        validationDiv.innerHTML = `
+            <span class="badge bg-secondary">
+                <i class="bi bi-dash-circle me-1"></i>未验证
+            </span>
+        `;
+    }
+}
+
 // Enhanced export for global access
 window.PodcastApp = {
     AppState,
@@ -2574,6 +2725,7 @@ window.PodcastApp = {
     formatDuration,
     formatFileSize,
     initializeAPIConfiguration,
+    initializePersistentAPIKeys,
     handleToggleVisibility,
     handleAPIKeyValidation,
     handleSaveAPIConfiguration,

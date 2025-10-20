@@ -71,8 +71,10 @@ class ConfigurationService:
             self._models_cache = TTLCache(max_size=50, default_ttl=1800)
             # API keys cache with 5-minute TTL and 100 entries max
             self._api_keys_cache = TTLCache(max_size=100, default_ttl=300)
+            # API keys display cache with 3-minute TTL and 50 entries max for persistent display
+            self._api_keys_display_cache = TTLCache(max_size=50, default_ttl=180)
 
-            self.logger.info("Configuration service initialized successfully with caching")
+            self.logger.info("Configuration service initialized successfully with enhanced caching")
 
         except Exception as e:
             raise ConfigurationError(
@@ -313,6 +315,163 @@ class ConfigurationService:
                 config_key="api_keys_get",
                 original_error=e
             )
+
+    @handle_errors("get_api_keys_for_display", reraise=True)
+    def get_api_keys_for_display(self, session_id: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Retrieve API keys for persistent display with proper masking and validation status.
+
+        This method is specifically designed for the persistent API key display feature.
+        It returns both masked API keys and their validation status for proper frontend display.
+
+        Args:
+            session_id: Unique session identifier for the user
+
+        Returns:
+            Dictionary with structure:
+            {
+                'masked_keys': {provider: masked_key},  # Masked for display
+                'validity': {provider: is_valid},        # Validation status
+                'providers': [provider_list],            # List of all providers
+                'has_keys': boolean                      # Whether any keys exist
+            }
+
+        Raises:
+            ValidationError: If session_id is invalid
+            ConfigurationError: If retrieval operations fail
+            DatabaseError: If database operations fail
+
+        Examples:
+            >>> service = ConfigurationService()
+            >>> result = service.get_api_keys_for_display("session123")
+            >>> print(result['masked_keys']['deepseek'])
+            sk-12**********abcd
+            >>> print(result['validity']['deepseek'])
+            True
+        """
+        # Validate input parameters
+        if not session_id or not isinstance(session_id, str):
+            raise ValidationError("Session ID must be a non-empty string", field="session_id")
+
+        session_id = session_id.strip()
+
+        try:
+            self.logger.debug(f"Getting API keys for persistent display from session: {session_id}")
+
+            # Check cache first for better performance
+            cache_key = f"api_keys_display:{session_id}"
+            cached_result = self._api_keys_display_cache.get(cache_key)
+            if cached_result is not None:
+                self.logger.debug(f"Cache hit for API keys display for session: {session_id}")
+                return cached_result
+
+            # Cache miss - fetch from database
+            self.logger.debug(f"Cache miss for API keys display for session: {session_id}")
+
+            # Get user configuration
+            user_config = self.repository.get_user_config(session_id)
+            if not user_config:
+                self.logger.debug(f"No configuration found for session: {session_id}")
+                return {
+                    'masked_keys': {},
+                    'validity': {},
+                    'providers': [],
+                    'has_keys': False
+                }
+
+            # Process API keys for display (complete keys, no masking)
+            complete_keys = {}
+            validity = {}
+            providers = []
+            load_failures = []
+
+            for api_key_config in user_config.api_keys:
+                provider = api_key_config.provider
+                plaintext_key = api_key_config.encrypted_key
+                is_valid = api_key_config.is_valid
+
+                try:
+                    if plaintext_key and plaintext_key.strip():
+                        # Use complete API key without masking
+                        complete_keys[provider] = plaintext_key
+                        validity[provider] = is_valid
+                        providers.append(provider)
+
+                        self.logger.debug(f"Processed {provider} API key for display (valid: {is_valid})")
+
+                except Exception as e:
+                    self.logger.error(f"Failed to process {provider} API key for display: {str(e)}")
+                    load_failures.append(f"{provider}: {str(e)}")
+                    continue
+
+            if load_failures:
+                self.logger.warning(f"Some API keys failed to process for display for session {session_id}: {'; '.join(load_failures)}")
+
+            # Prepare result
+            result = {
+                'masked_keys': complete_keys,  # Keep key name for compatibility but return complete keys
+                'validity': validity,
+                'providers': providers,
+                'has_keys': len(providers) > 0
+            }
+
+            # Cache the result for better performance
+            cache_key = f"api_keys_display:{session_id}"
+            self._api_keys_display_cache.set(cache_key, result)
+
+            # Log successful retrieval
+            self.repository.log_configuration_change(
+                session_id=session_id,
+                action="get_api_keys_for_display",
+                details=f"Retrieved {len(providers)} API keys for persistent display"
+            )
+
+            self.logger.info(f"Successfully retrieved {len(providers)} API keys for persistent display for session: {session_id}")
+            return result
+
+        except Exception as e:
+            if isinstance(e, (ValidationError, ConfigurationError, DatabaseError)):
+                raise
+
+            # Log unexpected errors
+            self.logger.error(f"Unexpected error getting API keys for display for session {session_id}: {str(e)}")
+            raise ConfigurationError(
+                f"Failed to retrieve API keys for display: {str(e)}",
+                config_key="api_keys_display_get",
+                original_error=e
+            )
+
+    def _mask_api_key_for_display(self, api_key: str) -> str:
+        """
+        Create a masked version of API key for secure display.
+
+        Args:
+            api_key: The API key to mask
+
+        Returns:
+            Masked API key string
+        """
+        if not api_key or len(api_key) <= 4:
+            return api_key or ""
+
+        # Enhanced masking logic similar to the one in app.py
+        if len(api_key) > 8:
+            # Show first 4-6 characters and last 4 characters
+            if api_key.startswith('sk-'):
+                # For OpenAI-style keys, show 'sk-' + first 2 + last 4
+                return api_key[:6] + '*' * (len(api_key) - 10) + api_key[-4:]
+            elif len(api_key) > 12:
+                # For longer keys, show first few and last few
+                return api_key[:4] + '*' * (len(api_key) - 8) + api_key[-4:]
+            else:
+                # For shorter keys, show first 2 and last 2
+                return api_key[:2] + '*' * (len(api_key) - 4) + api_key[-2:]
+        elif len(api_key) > 4:
+            # For medium keys, show last 4 characters only
+            return '*' * (len(api_key) - 4) + api_key[-4:]
+        else:
+            # For very short keys, show as is
+            return api_key
 
     @handle_errors("save_agent_config", reraise=True)
     def save_agent_config(self, session_id: str, agent_id: str, provider: str, model: str) -> bool:

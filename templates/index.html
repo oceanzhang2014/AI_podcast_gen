@@ -166,9 +166,21 @@
                                                     <div class="flex-grow-1">
                                                         <small class="text-muted">验证状态：</small>
                                                         <div id="deepseek-validation-home" class="validation-status mt-1">
-                                                            <span class="badge bg-secondary">
-                                                                <i class="bi bi-dash-circle me-1"></i>未验证
-                                                            </span>
+                                                            {% if api_key_validity and api_key_validity.deepseek %}
+                                                                {% if api_key_validity.deepseek %}
+                                                                    <span class="badge bg-success">
+                                                                        <i class="bi bi-check-circle me-1"></i>已验证
+                                                                    </span>
+                                                                {% else %}
+                                                                    <span class="badge bg-warning">
+                                                                        <i class="bi bi-exclamation-triangle me-1"></i>待验证
+                                                                    </span>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <span class="badge bg-secondary">
+                                                                    <i class="bi bi-dash-circle me-1"></i>未验证
+                                                                </span>
+                                                            {% endif %}
                                                         </div>
                                                     </div>
                                                     <div class="ms-2">
@@ -202,6 +214,7 @@
                                                                name="api_keys.bigmodel"
                                                                placeholder="..."
                                                                autocomplete="off"
+                                                               value="{% if api_keys and api_keys.bigmodel %}{{ api_keys.bigmodel }}{% endif %}"
                                                                required>
                                                         <button class="btn btn-outline-secondary toggle-visibility-btn"
                                                                 type="button"
@@ -222,9 +235,21 @@
                                                     <div class="flex-grow-1">
                                                         <small class="text-muted">验证状态：</small>
                                                         <div id="bigmodel-validation-home" class="validation-status mt-1">
-                                                            <span class="badge bg-secondary">
-                                                                <i class="bi bi-dash-circle me-1"></i>未验证
-                                                            </span>
+                                                            {% if api_key_validity and api_key_validity.bigmodel %}
+                                                                {% if api_key_validity.bigmodel %}
+                                                                    <span class="badge bg-success">
+                                                                        <i class="bi bi-check-circle me-1"></i>已验证
+                                                                    </span>
+                                                                {% else %}
+                                                                    <span class="badge bg-warning">
+                                                                        <i class="bi bi-exclamation-triangle me-1"></i>待验证
+                                                                    </span>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <span class="badge bg-secondary">
+                                                                    <i class="bi bi-dash-circle me-1"></i>未验证
+                                                                </span>
+                                                            {% endif %}
                                                         </div>
                                                     </div>
                                                     <div class="ms-2">
@@ -258,6 +283,7 @@
                                                                name="api_keys.openai"
                                                                placeholder="sk-..."
                                                                autocomplete="off"
+                                                               value="{% if api_keys and api_keys.openai %}{{ api_keys.openai }}{% endif %}"
                                                                required>
                                                         <button class="btn btn-outline-secondary toggle-visibility-btn"
                                                                 type="button"
@@ -278,9 +304,21 @@
                                                     <div class="flex-grow-1">
                                                         <small class="text-muted">验证状态：</small>
                                                         <div id="openai-validation-home" class="validation-status mt-1">
-                                                            <span class="badge bg-secondary">
-                                                                <i class="bi bi-dash-circle me-1"></i>未验证
-                                                            </span>
+                                                            {% if api_key_validity and api_key_validity.openai %}
+                                                                {% if api_key_validity.openai %}
+                                                                    <span class="badge bg-success">
+                                                                        <i class="bi bi-check-circle me-1"></i>已验证
+                                                                    </span>
+                                                                {% else %}
+                                                                    <span class="badge bg-warning">
+                                                                        <i class="bi bi-exclamation-triangle me-1"></i>待验证
+                                                                    </span>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <span class="badge bg-secondary">
+                                                                    <i class="bi bi-dash-circle me-1"></i>未验证
+                                                                </span>
+                                                            {% endif %}
                                                         </div>
                                                     </div>
                                                     <div class="ms-2">
@@ -595,6 +633,12 @@
         window.SAVED_CONFIG = {% if has_saved_config %}{{ saved_config | tojson }}{% else %}null{% endif %};
         window.CURRENT_USER = "{{ current_user }}";
         window.HAS_SAVED_CONFIG = {{ has_saved_config | lower }};
+
+        // Initialize API key data for persistent display
+        window.API_KEYS = {% if api_keys %}{{ api_keys | tojson }}{% else %}{}{% endif %};
+        window.API_KEY_VALIDITY = {% if api_key_validity %}{{ api_key_validity | tojson }}{% else %}{}{% endif %};
+        window.HAS_API_KEYS = {{ has_api_keys | lower }};
+        window.API_KEY_PROVIDERS = {% if api_key_providers %}{{ api_key_providers | tojson }}{% else %}[]{% endif %};
     </script>
 
     <!-- Custom JavaScript -->
